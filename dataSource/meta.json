@@ -1,0 +1,35 @@
+{
+ "built": "2026-10-30T03:19:34+00:00",
+ "stations": [
+  {
+   "id": "KINFORTW445",
+   "label": "Lafayette Fields (Fort Wayne, IN)",
+   "lat": 41.042,
+   "lon": -85.133,
+   "tz": "America/Indiana/Indianapolis",
+   "first": "2026-10-15 00:04:55",
+   "count": 4240,
+   "gapMinutes": 526
+  },
+  {
+   "id": "KTXELGIN136",
+   "label": "House of Shih Tzus (Elgin, TX)",
+   "lat": 30.353,
+   "lon": -97.375,
+   "tz": "America/Chicago",
+   "first": "2026-10-15 00:04:53",
+   "count": 4296,
+   "gapMinutes": 0
+  },
+  {
+   "id": "IKINGS702",
+   "label": "Boys' Town (Kingsburg, CA)",
+   "lat": 36.517188,
+   "lon": -119.518769,
+   "tz": "America/Los_Angeles",
+   "first": "2026-10-16 14:25:00",
+   "count": 3657,
+   "gapMinutes": 275
+  }
+ ]
+}
