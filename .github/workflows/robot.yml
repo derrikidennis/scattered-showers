@@ -1,8 +1,9 @@
 # The robot's instructions. GitHub reads this file from .github/workflows/robot.yml (scr/publish.py copies it there).
 # One run = scr/robot.py (collect, build, check, save data) and then publish the page.
 #
-# Timer is ON: runs every 5 minutes, and can still be started by hand with "Run workflow".
-# To turn the timer off: put # back in front of the three "schedule" lines (or Disable workflow on the Actions tab).
+# No timer in this file. GitHub's own timer never fired for this repo (1 run in about 11 hours), so it was removed on 2026-10-31.
+# A Cloudflare Worker named scattered-showers-pinger (code: scr/pinger_worker.js) presses "Run workflow" every 5 minutes.
+# It can still be started by hand with "Run workflow" (untick Dry run to really publish).
 
 name: Scattered Showers robot
 
@@ -21,9 +22,6 @@ on:
         description: "Start a new empty data branch if none exists (loses nothing only if you mean to start from scratch)"
         type: boolean
         default: false
-  schedule:
-    # every 5 minutes, at :03, :08, :13 ... (off the busy :00/:05 marks). GitHub may run it late, or skip a run when it is busy; times are UTC.
-    - cron: "3-58/5 * * * *"
 
 permissions:
   contents: write   # save data to the data branch
