@@ -1,6 +1,6 @@
 {
   "name": "Scattered Showers",
-  "short_name": "Sctd Shwrs",
+  "short_name": "Sct Shwrs",
   "description": "Weather at three stations: Fort Wayne, Elgin and Kingsburg.",
   "start_url": "./",
   "scope": "./",
