@@ -153,7 +153,7 @@ details.sec[open]>summary{color:var(--storm);font-weight:600}
 
 <h3>Everything further down</h3>
 <div class="mapbox">
-<div><figure><div class="frame"><a href="img/page_map.png" target="_blank" rel="noopener" title="Open the full-size picture"><img src="img/page_map.png" alt="The whole page for one place, shrunk to fit" width="1200" height="3537"></a><span class="mk" style="left:7.5%;top:6.96%">1</span><span class="mk" style="left:7.5%;top:16.99%">2</span><span class="mk" style="left:7.5%;top:23.62%">3</span><span class="mk" style="left:7.5%;top:33.91%">4</span><span class="mk" style="left:7.5%;top:52.12%">5</span><span class="mk" style="left:7.5%;top:64.6%">6</span><span class="mk" style="left:7.5%;top:80.37%">7</span></div></figure></div>
+<div><figure><div class="frame"><a href="img/page_map.png" target="_blank" rel="noopener" title="Open the full-size picture"><img src="img/page_map.png" alt="The whole page for one place, shrunk to fit" width="1200" height="3289"></a><span class="mk" style="left:7.5%;top:7.49%">1</span><span class="mk" style="left:7.5%;top:19%">2</span><span class="mk" style="left:7.5%;top:26.14%">3</span><span class="mk" style="left:7.5%;top:38.6%">4</span><span class="mk" style="left:7.5%;top:58.17%">5</span><span class="mk" style="left:7.5%;top:71.6%">6</span><span class="mk" style="left:7.5%;top:77.85%">7</span></div></figure></div>
 <div>
 <ol class="cap">
 <li>Right now. The tiles above.</li>
@@ -185,13 +185,15 @@ details.sec[open]>summary{color:var(--storm);font-weight:600}
 <p>A blue percentage under the temperature is the chance of rain. It only shows up when the chance is 10% or more. No number means rain is unlikely.</p>
 <p>The strip scrolls sideways. Drag it, or swipe on a phone. A bold day name (Fri) marks where midnight falls.</p>
 <h3>The next 5 days</h3>
-<figure><div class="frame"><a href="img/fc_row.png" target="_blank" rel="noopener" title="Open the full-size picture"><img src="img/fc_row.png" alt="Five forecast cards, Thursday to Monday" width="2360" height="668"></a><span class="mk" style="left:23.91%;top:26.34%">1</span><span class="mk" style="left:30.05%;top:42.42%">2</span><span class="mk" style="left:28.81%;top:71.68%">3</span></div></figure>
+<figure><div class="frame"><a href="img/fc_row.png" target="_blank" rel="noopener" title="Open the full-size picture"><img src="img/fc_row.png" alt="Five forecast cards for Elgin, starting with Tonight" width="2376" height="895"></a><span class="mk" style="left:17.71%;top:27.53%">1</span><span class="mk" style="left:17.71%;top:34.28%">2</span><span class="mk" style="left:17.71%;top:51.09%">3</span><span class="mk" style="left:77.41%;top:82.38%">4</span></div></figure>
 <ol class="cap">
-<li>The day.</li>
-<li>High, then low.</li>
-<li>Chance of rain and wind. Below that, a sentence about the day, then sunrise and sunset.</li>
+<li>The day. In the evening the first card says Tonight.</li>
+<li>High, then low. Tonight's card has a dash where the high goes, because the daytime is over.</li>
+<li>Chance of rain and wind. Sunrise and sunset come last.</li>
+<li>An extra sentence, only when there's something extra: when the rain comes, fog, gusts, or how much rain to expect. A card with nothing extra has no sentence.</li>
 </ol>
-<p class="aside">The hourly strip and the daily cards come from different places. Hourly is from the National Weather Service. The daily cards are from Weather Underground. So Thursday's high on one can be a degree or two off from the other. Neither is wrong. They're two forecasters guessing at the same sky.</p>
+<p>The chance of rain is the higher of the day and the night. In the picture, Monday says Partly Sunny and still shows 51%, because the rain comes after dark. When that happens, the icon turns to rain, the words say what's coming (Partly Sunny, then Chance Showers And Thunderstorms), and the extra sentence starts with "That night".</p>
+<p class="aside">The hourly strip and the daily cards both come from the National Weather Service, so they tell the same story.</p>
 <p class="note">The time buttons at the top don't change either one.</p>
 </div></details>
 <details class="sec" id="s5"><summary>Watch the radar</summary>
@@ -339,7 +341,7 @@ details.sec[open]>summary{color:var(--storm);font-weight:600}
 <p><b>Outage.</b> A silence of more than 10 minutes between readings.</p>
 <p><b>Radar.</b> A map that shows where rain and snow are falling.</p>
 <h3>Where the numbers come from</h3>
-<p>Current conditions are from the three personal weather stations, collected through Weather Underground every 15 minutes. The 5-day forecast is Weather Underground's. The hourly strip is the National Weather Service. Alerts are the National Weather Service, checked every 5 minutes. Radar comes from the Iowa Environmental Mesonet, with RainViewer as a backup. Records are NOAA's. The snow estimate is Open-Meteo's weather model.</p>
+<p>Current conditions are from three Acurite personal weather stations, collected through Weather Underground every 15 minutes. The 5-day forecast and the hourly strip are the National Weather Service's. Alerts are the National Weather Service, checked every 5 minutes. Radar comes from the Iowa Environmental Mesonet, with RainViewer as a backup. Records are NOAA's. The snow estimate is Open-Meteo's weather model.</p>
 </div></details>
 </div>
 
