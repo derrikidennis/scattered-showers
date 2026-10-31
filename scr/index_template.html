@@ -1194,7 +1194,7 @@ function init(){
   sel.addEventListener("change",()=>{ state.station=sel.value; state.metric="temp"; setHash(); status(); if(phone()) closePanel(); render(); });
   mk();
   document.getElementById("stationsLine").textContent=ST.map(short).join(" · ");
-  document.getElementById("foot").textContent="Source: Weather Underground personal weather station data, collected every 15 minutes by wu_collect.py and saved in monthly CSV files. Forecast: National Weather Service. Alerts: National Weather Service (api.weather.gov), checked every 5 minutes for each station's chosen address by wx_alerts.py. Pressure is the average of each 5-minute min and max, so it is rounded to 0.1 in. Right now cards use a live reading when it is newer than the saved history. Page built "+stamp(BUILT)+" "+zoneAbbr(BUILT)+" · history saved since "+((d)=>{const p=d.split("-"); return (+p[1])+"/"+(+p[2]);})(DATA.start)+".";
+  document.getElementById("foot").textContent="Source: Weather Underground personal weather station data, history collected every 15 minutes by wu_collect.py and saved in monthly CSV files, plus a live reading every 5 minutes for the Right now cards. Forecast: National Weather Service. Alerts: National Weather Service (api.weather.gov), checked every 5 minutes for each station's chosen address by wx_alerts.py. Pressure is the average of each 5-minute min and max, so it is rounded to 0.1 in. Right now cards use a live reading when it is newer than the saved history. Page built "+stamp(BUILT)+" "+zoneAbbr(BUILT)+" · history saved since "+((d)=>{const p=d.split("-"); return (+p[1])+"/"+(+p[2]);})(DATA.start)+".";
   const view=restoreView();
   initRefresh();
   render();

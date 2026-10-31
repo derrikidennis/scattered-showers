@@ -17,6 +17,11 @@ station) and saves them to ../src/dataSource/live.json. That file is only for th
 Right now cards. It is never added to the CSVs. If the live step fails, history saving is not
 affected: it has already finished by then.
 
+Run with --live-only to skip the history work and take only the live readings (1 call per station).
+The GitHub robot does this on the runs where history is not due yet, so the Right now cards update
+every 5 minutes while history is fetched about every 15. live.json remembers when history was last
+fetched ("historyFetched"), so a live-only run does not reset that clock.
+
 Folders (relative to this file):
   ../assets/wu_api_source.md      holds the API key (never printed or logged)
   ../assets/readings/             output CSVs, e.g. KINFORTW445_2026-10.csv
@@ -35,6 +40,7 @@ LIVE = ROOT / "src" / "dataSource" / "live.json"
 BASE = "https://api.weather.com/v2/pws"
 PAUSE = 2.1            # seconds between calls, keeps us under 30 calls a minute
 DRY = "--dry-run" in sys.argv
+LIVE_ONLY = "--live-only" in sys.argv
 
 TOP = ["stationID", "obsTimeUtc", "obsTimeLocal", "epoch", "tz", "lat", "lon",
        "solarRadiationHigh", "uvHigh", "winddirAvg",
@@ -192,14 +198,19 @@ def fetch_live(st, key):
             "humidity": o.get("humidity"), "winddir": o.get("winddir"), "uv": o.get("uv"),
             "solar": o.get("solarRadiation")}
 
-def save_live(stations_cfg, key, notes):
-    """Take a live reading for each station and merge it into live.json. Never raises."""
+def save_live(stations_cfg, key, notes, history_done=True):
+    """Take a live reading for each station and merge it into live.json. Never raises.
+    live.json also keeps "historyFetched", the last time history was fetched. Only a run that did the
+    history work (history_done) moves it; a live-only run carries the old value forward."""
     got = 0
     try:
         try:
-            old = json.loads(LIVE.read_text(encoding="utf-8")).get("stations", {}) if LIVE.exists() else {}
+            olddoc = json.loads(LIVE.read_text(encoding="utf-8")) if LIVE.exists() else {}
         except Exception:
-            old = {}
+            olddoc = {}
+        if not isinstance(olddoc, dict):
+            olddoc = {}
+        old = olddoc.get("stations", {})
         stations = dict(old)
         for st in stations_cfg:
             try:
@@ -217,7 +228,9 @@ def save_live(stations_cfg, key, notes):
         if got and not DRY:
             LIVE.parent.mkdir(parents=True, exist_ok=True)
             tmp = LIVE.with_suffix(".tmp")
-            tmp.write_text(json.dumps({"fetched": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"), "stations": stations}), encoding="utf-8")
+            now_s = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+            hist_s = now_s if history_done else (olddoc.get("historyFetched") or olddoc.get("fetched") or now_s)
+            tmp.write_text(json.dumps({"fetched": now_s, "historyFetched": hist_s, "stations": stations}), encoding="utf-8")
             os.replace(tmp, LIVE)
     except Exception as e:
         notes.append("live: " + type(e).__name__ + ": " + str(e))
@@ -234,7 +247,7 @@ def main():
         return 1
     notes, parts = [], []
     try:
-        for st in cfg["stations"]:
+        for st in ([] if LIVE_ONLY else cfg["stations"]):
             try:
                 n, d = run_station(st, start, key, notes)
                 parts.append(f"{st['id']} +{n} rows ({d} history days)")
@@ -246,9 +259,9 @@ def main():
     except Stop as e:
         notes.append(str(e))
     # skip the live step if WU already refused us (key rejected or rate limit)
-    live_got = 0 if any("HTTP" in n for n in notes) else save_live(cfg["stations"], key, notes)
+    live_got = 0 if any("HTTP" in n for n in notes) else save_live(cfg["stations"], key, notes, history_done=not LIVE_ONLY)
     parts.append(f"live {live_got}/{len(cfg['stations'])}")
-    line = datetime.now().strftime("%Y-%m-%d %H:%M:%S") + (" [dry run] " if DRY else " ") + "; ".join(parts)
+    line = datetime.now().strftime("%Y-%m-%d %H:%M:%S") + (" [dry run] " if DRY else " ") + ("[live only] " if LIVE_ONLY else "") + "; ".join(parts)
     if notes:
         line += " | NOTES: " + " / ".join(notes)
     print(line)

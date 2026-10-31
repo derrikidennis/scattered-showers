@@ -310,7 +310,7 @@ details.sec[open]>summary{color:var(--storm);font-weight:600}
 <details class="sec" id="s12"><summary>Get the latest numbers</summary>
 <div class="secbody">
 <p class="lead">The page updates itself. It checks for new numbers every minute and reloads when there are some.</p>
-<p>The weather stations report to the internet every few minutes. The dashboard collects them every 15 minutes, and alerts every 5. So the numbers can be up to about 15 minutes behind the station. That's the normal delay.</p>
+<p>The weather stations report to the internet every few minutes. The dashboard takes a live reading for the Right now cards every 5 minutes, saves the full history every 15 minutes, and checks alerts every 5. So the Right now numbers can be a few minutes behind the station, and the charts a little more. That's the normal delay.</p>
 <figure><div class="frame narrow"><a href="img/refresh_area.png" target="_blank" rel="noopener" title="Open the full-size picture"><img src="img/refresh_area.png" alt="The Refresh data button and the Updated line" width="1133" height="252"></a><span class="mk" style="left:71.27%;top:22.12%">1</span></div></figure>
 <ol class="cap"><li>Refresh data. Asks for the newest numbers right now.</li></ol>
 <p>The "Updated" time next to it says when the page was last built. Check it first if a number looks stale.</p>
@@ -341,7 +341,7 @@ details.sec[open]>summary{color:var(--storm);font-weight:600}
 <p><b>Outage.</b> A silence of more than 10 minutes between readings.</p>
 <p><b>Radar.</b> A map that shows where rain and snow are falling.</p>
 <h3>Where the numbers come from</h3>
-<p>Current conditions are from three Acurite personal weather stations, collected through Weather Underground every 15 minutes. The 5-day forecast and the hourly strip are the National Weather Service's. Alerts are the National Weather Service, checked every 5 minutes. Radar comes from the Iowa Environmental Mesonet, with RainViewer as a backup. Records are NOAA's. The snow estimate is Open-Meteo's weather model.</p>
+<p>Current conditions are from three Acurite personal weather stations, collected through Weather Underground (the Right now readings every 5 minutes, the saved history every 15). The 5-day forecast and the hourly strip are the National Weather Service's. Alerts are the National Weather Service, checked every 5 minutes. Radar comes from the Iowa Environmental Mesonet, with RainViewer as a backup. Records are NOAA's. The snow estimate is Open-Meteo's weather model.</p>
 </div></details>
 </div>
 

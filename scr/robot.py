@@ -2,7 +2,8 @@
 
 What one run does, in order:
   1. Gets the saved history from the `data` branch (a separate branch that holds only data) into _data/ and puts it where the scripts expect it.
-  2. Gets new readings from Weather Underground, but only when the last fetch is 13+ minutes old (the timer fires every 5 minutes, readings every 15).
+  2. Gets readings from Weather Underground. The live reading (the Right now cards) is taken on every run, so every 5 minutes.
+     The history (5-minute readings, up to 24 hours back) is fetched only when the last history fetch is 13+ minutes old, so about every 15.
   3. Runs the snow check (it skips itself unless its last check is 55+ minutes old), the alert outlines, and the alert check.
   4. Builds the page once.
   5. Checks the built page and the data files for leaks (scr/publish.py --check). Any problem stops the run: nothing is saved or published.
@@ -127,6 +128,21 @@ def live_age_s():
         return None
 
 
+def history_age_s():
+    """Seconds since the history was last fetched. live.json remembers it as "historyFetched" (older files only have "fetched")."""
+    try:
+        d = json.loads((BASE / "src" / "dataSource" / "live.json").read_text(encoding="utf-8"))
+        t = d.get("historyFetched") or d["fetched"]
+        return time.time() - datetime.fromisoformat(t.replace("Z", "+00:00")).timestamp()
+    except Exception:
+        return None
+
+
+def readings_mode(age, force):
+    """"full" = history and live reading, "live" = live reading only."""
+    return "full" if (force or age is None or age >= COLLECT_EVERY_S) else "live"
+
+
 def run(script, args=(), timeout=600):
     r = subprocess.run([sys.executable, str(SCR / script), *args], capture_output=True, text=True, timeout=timeout, cwd=BASE)
     lines = [scrub(l) for l in ((r.stdout or "") + (r.stderr or "")).strip().splitlines() if l.strip()]
@@ -177,12 +193,13 @@ def main():
     if existed and (BASE / "seed").is_dir():
         say("NOTE: the seed folder is no longer needed. Delete it on the PC with: python scr\\publish.py --remove-seed")
 
-    age = live_age_s()
-    if FORCE or age is None or age >= COLLECT_EVERY_S:
+    age = history_age_s()
+    if readings_mode(age, FORCE) == "full":
         rc, lines = run("wu_collect.py")
         say("Readings: " + (lines[-1][:300] if lines else "no output") + ("" if rc == 0 else "  [the collector reported a problem; carrying on with the saved data]"))
     else:
-        say(f"Readings: last fetch {age / 60:.0f} min ago, not due yet.")
+        rc, lines = run("wu_collect.py", ["--live-only"])
+        say(f"Readings (live only; history was fetched {age / 60:.0f} min ago): " + (lines[-1][:300] if lines else "no output") + ("" if rc == 0 else "  [the collector reported a problem; carrying on with the saved data]"))
     rc, lines = run("wx_snow.py");        say("Snow: " + (lines[-1][:200] if lines else "no output"))
     rc, lines = run("wx_alert_shapes.py"); say("Alert outlines: " + (lines[-1][:200] if lines else "no output"))
     rc, lines = run("wx_alerts.py", ["--no-build"]); say("Alerts: " + (lines[-1][:200] if lines else "no output"))
