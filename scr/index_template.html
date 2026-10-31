@@ -262,6 +262,14 @@ function feelsFrom(t,w,hi,wc){ if(t!=null&&t>=80&&hi!=null) return hi; if(t!=nul
     L.rainRate=v.precipRate; L.rainToday=v.precipTotal; if(v.uv!=null) L.uv=v.uv;
     if(L.todayHi!=null&&v.temp>L.todayHi) L.todayHi=v.temp; if(L.todayLo!=null&&v.temp<L.todayLo) L.todayLo=v.temp;
     if(L.todayGust!=null&&v.windGust!=null&&v.windGust>L.todayGust) L.todayGust=v.windGust;
+    /* Today's row in the daily summary: the most extreme of history and live wins (high, low, gust); rain takes the bigger total. Averages stay on history. */
+    const dd=s.daily.find(x=>x.date===(v.local||"").slice(0,10));
+    if(dd){
+      if(dd.hi==null||v.temp>dd.hi) dd.hi=v.temp;
+      if(dd.lo==null||v.temp<dd.lo) dd.lo=v.temp;
+      if(v.windGust!=null){ if(dd.gust==null||v.windGust>dd.gust) dd.gust=v.windGust; if(dd.gHi==null||v.windGust>dd.gHi) dd.gHi=v.windGust; }
+      if(v.precipTotal!=null&&v.precipTotal>(dd.rain||0)) dd.rain=v.precipTotal;
+    }
     s.liveUsed=true;
   });
 })();
