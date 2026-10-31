@@ -218,6 +218,12 @@ def main():
         shutil.copytree(BASE / "docx", SITE / "docx")
     else:
         say("WARNING: no docx/ folder, so the How To Guide is missing from the site.")
+    if (BASE / "pwa").exists():          # home-screen icon files and manifest sit at the site root, next to index.html
+        for p in sorted((BASE / "pwa").iterdir()):
+            if p.is_file():
+                shutil.copy2(p, SITE / p.name)
+    else:
+        say("WARNING: no pwa/ folder, so the home-screen icon is missing from the site.")
 
     n = sync_out(cfg)
     for folder, kind in ((SITE, "site"), (DATA, "data")):

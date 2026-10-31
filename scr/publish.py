@@ -57,7 +57,7 @@ carto_key.md
 nws_contact.md
 """
 
-TEXT = {".py", ".html", ".json", ".js", ".css", ".yml", ".yaml", ".txt", ".md", ".csv", ".bat", ".vbs", ".gitignore", ".gitattributes"}
+TEXT = {".py", ".html", ".json", ".webmanifest", ".js", ".css", ".yml", ".yaml", ".txt", ".md", ".csv", ".bat", ".vbs", ".gitignore", ".gitattributes"}
 BAD_NAMES = {"wu_api_source.md", "carto_key.md", "nws_contact.md", ".env"}
 BAD_DIRS = {"_backup", "logs", "followUp", "md", "__pycache__"}
 
@@ -189,6 +189,9 @@ def approved():
     add(SRC / "docx" / "Scattered_Showers_Guide.html", "docx/Scattered_Showers_Guide.html")
     for p in sorted((SRC / "docx" / "img").glob("*.png")):
         add(p, f"docx/img/{p.name}")
+    for p in sorted((SRC / "pwa").glob("*")):                       # home-screen icon and the manifest (the robot copies these into the site root)
+        if p.is_file():
+            add(p, f"pwa/{p.name}")
     for p in sorted((HERE / "workflow").glob("*.yml")):          # the robot's instructions (written in step 4b)
         add(p, f".github/workflows/{p.name}")
     return files
