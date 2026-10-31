@@ -185,6 +185,9 @@ def approved():
     for p in sorted((HERE / "vendor" / "leaflet").glob("*")):
         if p.is_file():
             add(p, f"scr/vendor/leaflet/{p.name}")
+    for p in sorted((HERE / "vendor" / "lucide").glob("*")):          # radar speed icons: license notice kept (ISC)
+        if p.is_file():
+            add(p, f"scr/vendor/lucide/{p.name}")
     add(BASE / "requirements.txt", "requirements.txt")
     add(SRC / "docx" / "Scattered_Showers_Guide.html", "docx/Scattered_Showers_Guide.html")
     for p in sorted((SRC / "docx" / "img").glob("*.png")):

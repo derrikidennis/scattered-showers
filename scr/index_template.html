@@ -188,6 +188,13 @@ input[type=date]:focus-visible{outline:2px solid var(--cool);outline-offset:2px}
 .rd select{background:var(--card2)}
 @media (hover:hover){.rd button:hover,.rd select:hover{border-color:var(--mute)}}
 .rd input[type=range]{flex:1;min-width:140px;accent-color:var(--storm)}
+/* radar speed: tortoise at the slow end, rabbit at the fast end. Icons are Lucide (ISC license, scr/vendor/lucide/LICENSE). */
+.rd .rd-spd{display:flex;align-items:center;gap:6px;color:var(--mute)}
+.rd .rd-spd svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;display:block}
+.rd .rd-spd .rd-ic.on{color:var(--mint)}
+.rd .rd-spd .rd-sw{position:relative;display:flex;align-items:center}
+.rd .rd-spd input[type=range]{flex:none;width:120px;min-width:90px;margin:0}
+.rd .rd-spd .rd-tick{position:absolute;left:50%;top:50%;width:2px;height:14px;margin:-7px 0 0 -1px;background:var(--mute);opacity:.55;border-radius:1px;pointer-events:none}
 .rd .rd-map{height:380px;border-radius:8px;border:1px solid var(--line);cursor:zoom-in;isolation:isolate}
 .rd.fs .rd-map{cursor:grab}
 .card.rd.fs{position:fixed;inset:0;z-index:1000;border-radius:0;display:flex;flex-direction:column;padding:12px;margin:0}
@@ -998,12 +1005,25 @@ function hourlySection(s){
 function radarSection(s){
   if(typeof L==="undefined") return section("Radar",el("div","note","The map library did not load, so there is no radar on this page."));
   const STEP=300000, FRAMES=12, FRAME_MS=550, HOLD_LAST=1600;
+  const SPEED_KEY="ss.radarSpeed", SNAP=6;                                   /* speed slider 0..100, 50 = Normal; remembered on this device */
+  let speed=50; try{ const sv=parseInt(localStorage.getItem(SPEED_KEY),10); if(sv>=0&&sv<=100) speed=sv; }catch(e){}
+  const mult=()=>Math.pow(2.2,(50-speed)/50);                                 /* 0 -> 2.2x slower, 50 -> 1x, 100 -> 2.2x faster */
   const p2=n=>String(n).padStart(2,"0");
   const c=card("rd"), head=el("div","rd-head"); head.appendChild(el("h3",null,"Radar: "+short(s)));
   const rtime=el("span","rd-time"); head.appendChild(rtime); head.appendChild(el("span","rd-grow"));
   const exp=el("button",null,"Full screen"); exp.type="button"; head.appendChild(exp); c.appendChild(head);
   const ctl=el("div","rd-ctl"); const play=el("button",null,"Pause"); play.type="button"; ctl.appendChild(play);
   const slider=el("input"); slider.type="range"; slider.min=0; slider.max=0; slider.value=0; slider.setAttribute("aria-label","Radar frame"); ctl.appendChild(slider);
+  const spd=el("div","rd-spd"), tIc=el("span","rd-ic"), rIc=el("span","rd-ic"), sw=el("span","rd-sw"), sp=el("input"), tickEl=el("span","rd-tick");
+  const SV0='<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">';
+  tIc.innerHTML=SV0+'<path d="m12 10 2 4v3a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1v-3a8 8 0 1 0-16 0v3a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1v-3l2-4h4Z"/><path d="M4.82 7.9 8 10"/><path d="M15.18 7.9 12 10"/><path d="M16.93 10H20a2 2 0 0 1 0 4H2"/></svg>';
+  rIc.innerHTML=SV0+'<path d="M13 16a3 3 0 0 1 2.24 5"/><path d="M18 12h.01"/><path d="M18 21h-8a4 4 0 0 1-4-4 7 7 0 0 1 7-7h.2L9.6 6.4a1 1 0 1 1 2.8-2.8L15.8 7h.2c3.3 0 6 2.7 6 6v1a2 2 0 0 1-2 2h-1a3 3 0 0 0-3 3"/><path d="M20 8.54V4a2 2 0 1 0-4 0v3"/><path d="M7.612 12.524a3 3 0 1 0-1.6 4.3"/></svg>';
+  tIc.title="Slower"; rIc.title="Faster";
+  sp.type="range"; sp.min=0; sp.max=100; sp.step=1; sp.value=speed; sp.setAttribute("aria-label","Radar speed");
+  function paintSpeed(){ sp.setAttribute("aria-valuetext",speed===50?"Normal":(speed<50?"Slower":"Faster")); sp.title=speed===50?"Normal speed":(speed<50?"Slower":"Faster");
+    tIc.classList.toggle("on",speed<=44); rIc.classList.toggle("on",speed>=56); }
+  paintSpeed();
+  sw.appendChild(sp); sw.appendChild(tickEl); spd.appendChild(tIc); spd.appendChild(sw); spd.appendChild(rIc); ctl.appendChild(spd);
 
   const alBtn=el("button",null,"Alert outlines: on"); alBtn.type="button"; alBtn.setAttribute("aria-pressed","true"); ctl.appendChild(alBtn); const alInfo=el("span","rd-time"); ctl.appendChild(alInfo); c.appendChild(ctl);
   const mapEl=el("div","rd-map"); mapEl.title="Click for full screen"; c.appendChild(mapEl);
@@ -1057,7 +1077,7 @@ function radarSection(s){
     fr.forEach((f,k)=>{ if(f.layer) f.layer.setOpacity(k===inst.cur?0.85:0); });
     updateLegend(); slider.value=inst.cur; const f=fr[inst.cur], ago=Math.round((Date.now()-f.t)/60000);
     rtime.textContent=""; const b=el("b",null,fmtTime(f.t)); rtime.appendChild(b); rtime.appendChild(document.createTextNode(" ("+ago+" min ago)")); }
-  function schedule(){ if(inst.dead||!inst.playing) return; const t=setTimeout(tick,(inst.cur>=inst.frames.length-1)?HOLD_LAST:FRAME_MS); inst.timers.push(t); }
+  function schedule(){ if(inst.dead||!inst.playing) return; const t=setTimeout(tick,Math.round(((inst.cur>=inst.frames.length-1)?HOLD_LAST:FRAME_MS)*mult())); inst.timers.push(t); }
   function tick(){ if(inst.dead||!inst.playing) return;
     if(inst.visible&&!document.hidden&&inst.frames.length){ const nx=inst.cur>=inst.frames.length-1?0:inst.cur+1;
       if(inst.frames[nx].rv&&!inst.frames[nx].ready){ later(tick,500); return; }       /* RainViewer frame still loading: wait for it */
@@ -1097,6 +1117,10 @@ function radarSection(s){
     exp.addEventListener("click",()=>setFS(!inst.fs));
     inst.onKey=e=>{ if(e.key==="Escape"&&inst.fs) setFS(false); }; document.addEventListener("keydown",inst.onKey);
     play.addEventListener("click",()=>{ inst.playing=!inst.playing; play.textContent=inst.playing?"Pause":"Play"; if(inst.playing) schedule(); });
+    let kbd=false;                                                              /* arrow keys skip the snap so keyboard users can pass through Normal */
+    sp.addEventListener("keydown",()=>{ kbd=true; }); sp.addEventListener("pointerdown",()=>{ kbd=false; });
+    sp.addEventListener("input",()=>{ let v=parseInt(sp.value,10); if(!kbd&&Math.abs(v-50)<=SNAP){ v=50; sp.value=50; }
+      speed=v; paintSpeed(); try{ localStorage.setItem(SPEED_KEY,String(v)); }catch(e){} });
     slider.addEventListener("input",()=>{ inst.playing=false; play.textContent="Play"; show(parseInt(slider.value,10)); });
     if("IntersectionObserver" in window){ inst.io=new IntersectionObserver(e=>{ inst.visible=e[0].isIntersecting; }); inst.io.observe(c); }
     /* a new frame arrives: add it at the end, drop the oldest */
