@@ -1,0 +1,16 @@
+# Private or generated. None of this may ever be committed to main. (Written by scr/publish.py.)
+/assets/
+/src/
+/_data/
+/site/
+scr/_backup/
+logs/
+followUp/
+md/
+*.log
+*.lock
+*.tmp
+__pycache__/
+wu_api_source.md
+carto_key.md
+nws_contact.md

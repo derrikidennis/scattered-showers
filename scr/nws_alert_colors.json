@@ -1,0 +1,546 @@
+{
+ "_about": "Colors and priority numbers from the National Weather Service Watch, Warning, Advisory color guide (WWA_Changes_10124.pdf, file dated 2024-08-29). Lower priority number = more important. 'aliases' lets a renamed alert use the old name's color. 'hidden' types are never shown. 'pairs' maps a watch to the warnings that hide it while they are active. Types missing here get the 'unknown' gray.",
+ "types": {
+  "Tsunami Warning": {
+   "pri": 1,
+   "hex": "#FD6347"
+  },
+  "Tornado Warning": {
+   "pri": 2,
+   "hex": "#FF0000"
+  },
+  "Extreme Wind Warning": {
+   "pri": 3,
+   "hex": "#FF8C00"
+  },
+  "Severe Thunderstorm Warning": {
+   "pri": 4,
+   "hex": "#FFA500"
+  },
+  "Flash Flood Warning": {
+   "pri": 5,
+   "hex": "#8B0000"
+  },
+  "Flash Flood Statement": {
+   "pri": 6,
+   "hex": "#8B0000"
+  },
+  "Severe Weather Statement": {
+   "pri": 7,
+   "hex": "#00FFFF"
+  },
+  "Shelter In Place Warning": {
+   "pri": 8,
+   "hex": "#FA8072"
+  },
+  "Evacuation Immediate": {
+   "pri": 9,
+   "hex": "#7FFF00"
+  },
+  "Civil Danger Warning": {
+   "pri": 10,
+   "hex": "#FFB6C1"
+  },
+  "Nuclear Power Plant Warning": {
+   "pri": 11,
+   "hex": "#4B0082"
+  },
+  "Radiological Hazard Warning": {
+   "pri": 12,
+   "hex": "#4B0082"
+  },
+  "Hazardous Materials Warning": {
+   "pri": 13,
+   "hex": "#4B0082"
+  },
+  "Fire Warning": {
+   "pri": 14,
+   "hex": "#A0522D"
+  },
+  "Civil Emergency Message": {
+   "pri": 15,
+   "hex": "#FFB6C1"
+  },
+  "Law Enforcement Warning": {
+   "pri": 16,
+   "hex": "#C0C0C0"
+  },
+  "Storm Surge Warning": {
+   "pri": 17,
+   "hex": "#B524F7"
+  },
+  "Hurricane Force Wind Warning": {
+   "pri": 18,
+   "hex": "#CD5C5C"
+  },
+  "Hurricane Warning": {
+   "pri": 19,
+   "hex": "#DC143C"
+  },
+  "Typhoon Warning": {
+   "pri": 20,
+   "hex": "#DC143C"
+  },
+  "Special Marine Warning": {
+   "pri": 21,
+   "hex": "#FFA500"
+  },
+  "Blizzard Warning": {
+   "pri": 22,
+   "hex": "#FF4500"
+  },
+  "Snow Squall Warning": {
+   "pri": 23,
+   "hex": "#C71585"
+  },
+  "Ice Storm Warning": {
+   "pri": 24,
+   "hex": "#8B008B"
+  },
+  "Heavy Freezing Spray Warning": {
+   "pri": 25,
+   "hex": "#00BFFF"
+  },
+  "Winter Storm Warning": {
+   "pri": 26,
+   "hex": "#FF69B4"
+  },
+  "Lake Effect Snow Warning": {
+   "pri": 27,
+   "hex": "#008B8B"
+  },
+  "Dust Storm Warning": {
+   "pri": 28,
+   "hex": "#FFE4C4"
+  },
+  "Blowing Dust Warning": {
+   "pri": 29,
+   "hex": "#FFE4C4"
+  },
+  "High Wind Warning": {
+   "pri": 30,
+   "hex": "#DAA520"
+  },
+  "Tropical Storm Warning": {
+   "pri": 31,
+   "hex": "#B22222"
+  },
+  "Storm Warning": {
+   "pri": 32,
+   "hex": "#9400D3"
+  },
+  "Tsunami Advisory": {
+   "pri": 33,
+   "hex": "#D2691E"
+  },
+  "Tsunami Watch": {
+   "pri": 34,
+   "hex": "#FF00FF"
+  },
+  "Avalanche Warning": {
+   "pri": 35,
+   "hex": "#1E90FF"
+  },
+  "Earthquake Warning": {
+   "pri": 36,
+   "hex": "#8B4513"
+  },
+  "Volcano Warning": {
+   "pri": 37,
+   "hex": "#2F4F4F"
+  },
+  "Ashfall Warning": {
+   "pri": 38,
+   "hex": "#A9A9A9"
+  },
+  "Flood Warning": {
+   "pri": 39,
+   "hex": "#00FF00"
+  },
+  "Coastal Flood Warning": {
+   "pri": 40,
+   "hex": "#228B22"
+  },
+  "Lakeshore Flood Warning": {
+   "pri": 41,
+   "hex": "#228B22"
+  },
+  "Ashfall Advisory": {
+   "pri": 42,
+   "hex": "#696969"
+  },
+  "High Surf Warning": {
+   "pri": 43,
+   "hex": "#228B22"
+  },
+  "Excessive Heat Warning": {
+   "pri": 44,
+   "hex": "#C71585"
+  },
+  "Tornado Watch": {
+   "pri": 45,
+   "hex": "#FFFF00"
+  },
+  "Severe Thunderstorm Watch": {
+   "pri": 46,
+   "hex": "#DB7093"
+  },
+  "Flash Flood Watch": {
+   "pri": 47,
+   "hex": "#2E8B57"
+  },
+  "Gale Warning": {
+   "pri": 48,
+   "hex": "#DDA0DD"
+  },
+  "Flood Statement": {
+   "pri": 49,
+   "hex": "#00FF00"
+  },
+  "Extreme Cold Warning": {
+   "pri": 50,
+   "hex": "#0000FF"
+  },
+  "Freeze Warning": {
+   "pri": 51,
+   "hex": "#483D8B"
+  },
+  "Red Flag Warning": {
+   "pri": 52,
+   "hex": "#FF1493"
+  },
+  "Storm Surge Watch": {
+   "pri": 53,
+   "hex": "#DB7FF7"
+  },
+  "Hurricane Watch": {
+   "pri": 54,
+   "hex": "#FF00FF"
+  },
+  "Hurricane Force Wind Watch": {
+   "pri": 55,
+   "hex": "#9932CC"
+  },
+  "Typhoon Watch": {
+   "pri": 56,
+   "hex": "#FF00FF"
+  },
+  "Tropical Storm Watch": {
+   "pri": 57,
+   "hex": "#F08080"
+  },
+  "Storm Watch": {
+   "pri": 58,
+   "hex": "#FFE4B5"
+  },
+  "Tropical Cyclone Local Statement": {
+   "pri": 59,
+   "hex": "#FFE4B5"
+  },
+  "Winter Weather Advisory": {
+   "pri": 60,
+   "hex": "#7B68EE"
+  },
+  "Avalanche Advisory": {
+   "pri": 61,
+   "hex": "#CD853F"
+  },
+  "Cold Weather Advisory": {
+   "pri": 62,
+   "hex": "#AFEEEE"
+  },
+  "Heat Advisory": {
+   "pri": 63,
+   "hex": "#FF7F50"
+  },
+  "Flood Advisory": {
+   "pri": 64,
+   "hex": "#00FF7F"
+  },
+  "Coastal Flood Advisory": {
+   "pri": 65,
+   "hex": "#7CFC00"
+  },
+  "Lakeshore Flood Advisory": {
+   "pri": 66,
+   "hex": "#7CFC00"
+  },
+  "High Surf Advisory": {
+   "pri": 67,
+   "hex": "#BA55D3"
+  },
+  "Dense Fog Advisory": {
+   "pri": 68,
+   "hex": "#708090"
+  },
+  "Dense Smoke Advisory": {
+   "pri": 69,
+   "hex": "#F0E68C"
+  },
+  "Small Craft Advisory": {
+   "pri": 70,
+   "hex": "#D8BFD8"
+  },
+  "Brisk Wind Advisory": {
+   "pri": 71,
+   "hex": "#D8BFD8"
+  },
+  "Hazardous Seas Warning": {
+   "pri": 72,
+   "hex": "#D8BFD8"
+  },
+  "Dust Advisory": {
+   "pri": 73,
+   "hex": "#BDB76B"
+  },
+  "Blowing Dust Advisory": {
+   "pri": 74,
+   "hex": "#BDB76B"
+  },
+  "Lake Wind Advisory": {
+   "pri": 75,
+   "hex": "#D2B48C"
+  },
+  "Wind Advisory": {
+   "pri": 76,
+   "hex": "#D2B48C"
+  },
+  "Frost Advisory": {
+   "pri": 77,
+   "hex": "#6495ED"
+  },
+  "Freezing Fog Advisory": {
+   "pri": 78,
+   "hex": "#008080"
+  },
+  "Freezing Spray Advisory": {
+   "pri": 79,
+   "hex": "#00BFFF"
+  },
+  "Low Water Advisory": {
+   "pri": 80,
+   "hex": "#A52A2A"
+  },
+  "Local Area Emergency": {
+   "pri": 81,
+   "hex": "#C0C0C0"
+  },
+  "Winter Storm Watch": {
+   "pri": 82,
+   "hex": "#4682B4"
+  },
+  "Rip Current Statement": {
+   "pri": 83,
+   "hex": "#40E0D0"
+  },
+  "Beach Hazards Statement": {
+   "pri": 84,
+   "hex": "#40E0D0"
+  },
+  "Gale Watch": {
+   "pri": 85,
+   "hex": "#FFC0CB"
+  },
+  "Avalanche Watch": {
+   "pri": 86,
+   "hex": "#F4A460"
+  },
+  "Hazardous Seas Watch": {
+   "pri": 87,
+   "hex": "#483D8B"
+  },
+  "Heavy Freezing Spray Watch": {
+   "pri": 88,
+   "hex": "#BC8F8F"
+  },
+  "Flood Watch": {
+   "pri": 89,
+   "hex": "#2E8B57"
+  },
+  "Coastal Flood Watch": {
+   "pri": 90,
+   "hex": "#66CDAA"
+  },
+  "Lakeshore Flood Watch": {
+   "pri": 91,
+   "hex": "#66CDAA"
+  },
+  "High Wind Watch": {
+   "pri": 92,
+   "hex": "#B8860B"
+  },
+  "Excessive Heat Watch": {
+   "pri": 93,
+   "hex": "#800000"
+  },
+  "Extreme Cold Watch": {
+   "pri": 94,
+   "hex": "#5F9EA0"
+  },
+  "Freeze Watch": {
+   "pri": 95,
+   "hex": "#00FFFF"
+  },
+  "Fire Weather Watch": {
+   "pri": 96,
+   "hex": "#FFDEAD"
+  },
+  "Extreme Fire Danger": {
+   "pri": 97,
+   "hex": "#E9967A"
+  },
+  "911 Telephone Outage": {
+   "pri": 98,
+   "hex": "#C0C0C0"
+  },
+  "Coastal Flood Statement": {
+   "pri": 99,
+   "hex": "#6B8E23"
+  },
+  "Lakeshore Flood Statement": {
+   "pri": 100,
+   "hex": "#6B8E23"
+  },
+  "Special Weather Statement": {
+   "pri": 101,
+   "hex": "#FFE4B5"
+  },
+  "Marine Weather Statement": {
+   "pri": 102,
+   "hex": "#FFDAB9"
+  },
+  "Air Quality Alert": {
+   "pri": 103,
+   "hex": "#808080"
+  },
+  "Air Stagnation Advisory": {
+   "pri": 104,
+   "hex": "#808080"
+  },
+  "Hazardous Weather Outlook": {
+   "pri": 105,
+   "hex": "#EEE8AA"
+  },
+  "Hydrologic Outlook": {
+   "pri": 106,
+   "hex": "#90EE90"
+  },
+  "Short Term Forecast": {
+   "pri": 107,
+   "hex": "#98FB98"
+  },
+  "Administrative Message": {
+   "pri": 108,
+   "hex": "#C0C0C0"
+  },
+  "Test": {
+   "pri": 109,
+   "hex": "#F0FFFF"
+  },
+  "Child Abduction Emergency": {
+   "pri": 110,
+   "hex": "#FFFFFF"
+  },
+  "Blue Alert": {
+   "pri": 111,
+   "hex": "#FFFFFF"
+  }
+ },
+ "aliases": {
+  "Extreme Heat Warning": "Excessive Heat Warning",
+  "Extreme Heat Watch": "Excessive Heat Watch"
+ },
+ "hidden": [
+  "Test",
+  "Administrative Message",
+  "911 Telephone Outage",
+  "Short Term Forecast",
+  "Hazardous Weather Outlook",
+  "Hydrologic Outlook",
+  "Child Abduction Emergency",
+  "Blue Alert"
+ ],
+ "pairs": {
+  "Tornado Watch": [
+   "Tornado Warning"
+  ],
+  "Severe Thunderstorm Watch": [
+   "Severe Thunderstorm Warning"
+  ],
+  "Flash Flood Watch": [
+   "Flash Flood Warning"
+  ],
+  "Flood Watch": [
+   "Flood Warning"
+  ],
+  "Winter Storm Watch": [
+   "Winter Storm Warning",
+   "Blizzard Warning",
+   "Ice Storm Warning",
+   "Lake Effect Snow Warning"
+  ],
+  "High Wind Watch": [
+   "High Wind Warning"
+  ],
+  "Freeze Watch": [
+   "Freeze Warning"
+  ],
+  "Extreme Heat Watch": [
+   "Extreme Heat Warning",
+   "Excessive Heat Warning"
+  ],
+  "Excessive Heat Watch": [
+   "Extreme Heat Warning",
+   "Excessive Heat Warning"
+  ],
+  "Extreme Cold Watch": [
+   "Extreme Cold Warning"
+  ],
+  "Fire Weather Watch": [
+   "Red Flag Warning"
+  ],
+  "Coastal Flood Watch": [
+   "Coastal Flood Warning"
+  ],
+  "Lakeshore Flood Watch": [
+   "Lakeshore Flood Warning"
+  ],
+  "Hurricane Watch": [
+   "Hurricane Warning"
+  ],
+  "Hurricane Force Wind Watch": [
+   "Hurricane Force Wind Warning"
+  ],
+  "Tropical Storm Watch": [
+   "Tropical Storm Warning"
+  ],
+  "Typhoon Watch": [
+   "Typhoon Warning"
+  ],
+  "Storm Surge Watch": [
+   "Storm Surge Warning"
+  ],
+  "Gale Watch": [
+   "Gale Warning"
+  ],
+  "Storm Watch": [
+   "Storm Warning"
+  ],
+  "Avalanche Watch": [
+   "Avalanche Warning"
+  ],
+  "Hazardous Seas Watch": [
+   "Hazardous Seas Warning"
+  ],
+  "Heavy Freezing Spray Watch": [
+   "Heavy Freezing Spray Warning"
+  ],
+  "Tsunami Watch": [
+   "Tsunami Warning"
+  ]
+ },
+ "unknown": {
+  "pri": 500,
+  "hex": "#808080"
+ }
+}

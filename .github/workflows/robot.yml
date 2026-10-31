@@ -1,0 +1,89 @@
+# The robot's instructions. GitHub reads this file from .github/workflows/robot.yml (scr/publish.py copies it there).
+# One run = scr/robot.py (collect, build, check, save data) and then publish the page.
+#
+# Trial mode: this version has NO timer. It only starts when you press "Run workflow" on the Actions tab.
+# Step 7 turns the timer on by removing the # marks on the three "schedule" lines.
+
+name: Scattered Showers robot
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run: do everything except save the data and publish the page"
+        type: boolean
+        default: true
+      force_collect:
+        description: "Fetch new readings even if the last fetch was recent"
+        type: boolean
+        default: false
+      allow_empty_data:
+        description: "Start a new empty data branch if none exists (loses nothing only if you mean to start from scratch)"
+        type: boolean
+        default: false
+  # schedule:
+  #   # every 5 minutes. GitHub may run it late, or skip a run when it is busy; times are UTC.
+  #   - cron: "*/5 * * * *"
+
+permissions:
+  contents: write   # save data to the data branch
+  pages: write      # publish the page
+  id-token: write   # needed by the publish step
+
+# One robot run at a time. A newer run waits instead of cancelling the one in progress.
+concurrency:
+  group: scattered-showers-robot
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Get the code
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+
+      - name: Install the two helper libraries
+        run: python -m pip install -r requirements.txt
+
+      - name: Run the robot
+        env:
+          WU_API_KEY: ${{ secrets.WU_API_KEY }}
+          NWS_CONTACT: ${{ secrets.NWS_CONTACT }}
+          CARTO_KEY: ${{ secrets.CARTO_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DRY_RUN: ${{ inputs.dry_run }}
+          FORCE_COLLECT: ${{ inputs.force_collect }}
+          ALLOW_EMPTY_DATA: ${{ inputs.allow_empty_data }}
+        run: python scr/robot.py
+
+      - name: Set up Pages
+        # skipped on a dry run, so a trial works before the Pages setting is switched
+        if: ${{ github.event_name == 'schedule' || inputs.dry_run == false }}
+        uses: actions/configure-pages@v5
+
+      - name: Package the page
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    # publish unless it is a dry run started by hand (timer runs always publish)
+    if: ${{ github.event_name == 'schedule' || inputs.dry_run == false }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Publish the page
+        id: deployment
+        uses: actions/deploy-pages@v4
