@@ -43,7 +43,8 @@ h2{font-size:15px;margin:30px 0 10px;font-weight:650;color:var(--ink)}
 .st{border-top:3px solid var(--c,var(--purple))}
 .st .name{font-weight:650;font-size:15px}
 .st.go{cursor:pointer;transition:border-color .15s,box-shadow .15s}
-.st.go:hover{border-color:var(--c,var(--purple));box-shadow:0 2px 10px rgba(0,0,0,.12)}
+/* Hover looks only on devices with a real pointer. On an iPad a tap leaves a phantom hover behind, and after the page redraws it lights up whatever tile is under the finger. */
+@media (hover:hover){.st.go:hover{border-color:var(--c,var(--purple));box-shadow:0 2px 10px rgba(0,0,0,.12)}}
 .st.go:focus-visible{outline:2px solid var(--c,var(--purple));outline-offset:2px}
 .pill{display:inline-block;max-width:100%;font-size:12px;padding:2px 8px;border-radius:12px;border:1px solid var(--line);color:var(--ink);white-space:normal}
 .pill.ok{color:var(--mint)} .pill.warn{color:var(--gold)}
@@ -60,7 +61,7 @@ h2{font-size:15px;margin:30px 0 10px;font-weight:650;color:var(--ink)}
 .cardhead{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:4px}
 .cardhead h3{margin:0;font-size:14px;font-weight:650}
 .tbtn{background:none;border:1px solid var(--line);color:var(--mute);border-radius:6px;padding:3px 9px;font:inherit;font-size:12px;cursor:pointer}
-.tbtn:hover{color:var(--ink)}
+@media (hover:hover){.tbtn:hover{color:var(--ink)}}
 .legend{display:flex;flex-wrap:wrap;gap:14px;font-size:12.5px;margin:2px 0 6px}
 .legend span{display:inline-flex;align-items:center;gap:6px;color:var(--ink)}
 .legend i{display:inline-block;width:16px;height:0;border-top:2px solid var(--c)}
@@ -110,7 +111,7 @@ th{color:var(--mute);font-weight:600;position:sticky;top:0;background:var(--card
 @media(max-width:900px){.actions{position:static;max-width:none;align-items:center;margin:12px 0 0}.actions .stat{justify-content:center;text-align:center}#refreshMsg{text-align:center}
   .masthead:has(#refreshMsg:not(:empty)),.masthead:has(.upd.warn),.masthead:has(#refreshMsg:not(:empty)):has(.upd.warn){padding-bottom:16px}}
 .act{background:var(--card2);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:8px 14px;font:inherit;cursor:pointer}
-.act:hover{border-color:var(--purple)}
+@media (hover:hover){.act:hover{border-color:var(--purple)}}
 .act:disabled{opacity:.6;cursor:wait}
 .upd{font-size:12.5px;color:var(--mute);white-space:nowrap}
 .upd.warn{color:var(--gold);white-space:normal}
@@ -133,7 +134,7 @@ th{color:var(--mute);font-weight:600;position:sticky;top:0;background:var(--card
 .tile .gz text{font-size:9px;fill:var(--mute)}
 .fc .ic{display:block;width:52px;height:52px;margin-bottom:6px}
 .tile{all:unset;box-sizing:border-box;cursor:pointer;background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:12px 14px 14px;display:flex;flex-direction:column;justify-content:flex-start;color:var(--ink);font:inherit}
-.tile:hover{border-color:var(--mute)}
+@media (hover:hover){.tile:hover{border-color:var(--mute)}}
 .tile[aria-pressed=true]{border-color:var(--c);box-shadow:inset 0 0 0 1px var(--c)}
 .tile:focus-visible{outline:2px solid var(--cool);outline-offset:2px}
 .tile span{display:block;color:var(--mute);font-size:11px;text-transform:uppercase;letter-spacing:.6px;text-align:center}
@@ -153,7 +154,7 @@ input[type=date]:focus-visible{outline:2px solid var(--cool);outline-offset:2px}
 .seg button[aria-pressed=false].on{color:var(--ink)}
 .scroll.tall{max-height:640px}
 .dayrow{cursor:pointer}
-.dayrow:hover td{background:var(--card2)}
+@media (hover:hover){.dayrow:hover td{background:var(--card2)}}
 .rowbtn{all:unset;cursor:pointer;color:var(--ink);display:inline-flex;gap:8px;align-items:center}
 .rowbtn:focus-visible{outline:2px solid var(--cool);outline-offset:2px}
 .rowbtn i{font-style:normal;color:var(--mute);width:10px}
@@ -185,7 +186,7 @@ input[type=date]:focus-visible{outline:2px solid var(--cool);outline-offset:2px}
 .rd .rd-ctl label{font-size:12.5px;color:var(--mute);display:flex;align-items:center;gap:6px}
 .rd button,.rd select{background:none;border:1px solid var(--line);color:var(--ink);border-radius:6px;padding:5px 10px;font:inherit;font-size:13px;cursor:pointer}
 .rd select{background:var(--card2)}
-.rd button:hover,.rd select:hover{border-color:var(--mute)}
+@media (hover:hover){.rd button:hover,.rd select:hover{border-color:var(--mute)}}
 .rd input[type=range]{flex:1;min-width:140px;accent-color:var(--storm)}
 .rd .rd-map{height:380px;border-radius:8px;border:1px solid var(--line);cursor:zoom-in;isolation:isolate}
 .rd.fs .rd-map{cursor:grab}
