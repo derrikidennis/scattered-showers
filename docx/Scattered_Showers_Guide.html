@@ -43,8 +43,8 @@ figure{margin:18px 0 6px;padding:0}
 ol.cap{list-style:none;padding:0;margin:10px 0 18px;counter-reset:c}
 ol.cap li{counter-increment:c;display:flex;gap:12px;margin:7px 0}
 ol.cap li::before{content:counter(c);flex:none;width:26px;height:26px;border-radius:50%;background:var(--gold);color:#15141b;font-weight:700;text-align:center;line-height:26px;font-size:15px;margin-top:2px}
-ol.steps{padding-left:24px}
-ol.steps li{margin:8px 0}
+ol.steps,ul.steps{padding-left:24px}
+ol.steps li,ul.steps li{margin:8px 0}
 .mapbox{display:grid;grid-template-columns:230px 1fr;gap:24px;align-items:start}
 @media(max-width:640px){.mapbox{grid-template-columns:1fr}.mapbox .frame{max-width:260px}}
 kbd,.k{background:var(--card2);border:1px solid var(--line);border-radius:6px;padding:0 6px;font-size:.92em}
@@ -92,7 +92,7 @@ details.sec[open]>summary{color:var(--storm);font-weight:600}
 <li>Pick dates. Choose your own start and end.</li>
 </ol>
 <p class="aside">Leave it alone and you get today. That's usually what you wanted.</p>
-<p class="note">The Refresh button and the "Updated" line at the very top are covered in task 12.</p>
+<p class="note">The "Updated" and "Alerts checked" lines at the very top are covered in task 12.</p>
 
 <h2 class="what">What do you want to do?</h2>
 <p class="note">Click a line to open it. Click it again to close it.</p>
@@ -351,17 +351,20 @@ details.sec[open]>summary{color:var(--storm);font-weight:600}
 <div class="secbody">
 <p class="lead">The page updates itself. It checks for new numbers every minute and reloads when there are some.</p>
 <p>The weather stations report to the internet every few minutes. The dashboard takes a live reading for the Right now cards every 5 minutes, saves the full history every 15 minutes, and checks alerts every 5. So the Right now numbers can be a few minutes behind the station, and the charts a little more. That's the normal delay.</p>
-<figure><div class="frame narrow"><a href="img/refresh_area.png" target="_blank" rel="noopener" title="Open the full-size picture"><img src="img/refresh_area.png" alt="The Refresh data button and the Updated line" width="1133" height="252"></a><span class="mk" style="left:71.27%;top:22.12%">1</span></div></figure>
-<ol class="cap"><li>Refresh data. Asks for the newest numbers right now.</li></ol>
-<p>The "Updated" time next to it says when the page was last built. Check it first if a number looks stale.</p>
-<p class="todo">Open: whether Refresh works for the family depends on how the page is shared (the publishing decision). Today it only works on the one computer running the helper program, and says so beside the button. Wording to be settled once that's decided.</p>
+<p>Two small lines at the top of the page tell you how fresh it is.</p>
+<ul class="steps">
+<li><b>Updated</b> and a time. When the page was last built. This is the one to check first if a number looks stale.</li>
+<li><b>Alerts checked</b> and a time. When the page last asked the weather service about storm alerts. If it says "last checked" with a warning color, it has been a while, or the weather service didn't answer.</li>
+</ul>
+<p>The page won't reload while a menu is open or you're typing in a box. It waits until you're done. When it does reload, it puts you back where you were.</p>
+<p>Want the newest numbers right now? Reload the page. On a phone, pull down from the top. On a computer, press <b>F5</b> (or <b>Cmd</b> and <b>R</b> on a Mac). You only get what's been collected, though. Reloading twice in a row won't change anything, because new numbers show up every 5 minutes.</p>
 </div></details>
 <details class="sec" id="s13"><summary>Something looks off</summary>
 <div class="secbody">
 <p>Look for the cause in this order.</p>
 <ol class="steps">
 <li>Is there a yellow triangle on the place's card? The station stopped reporting. The number is old. Nothing to fix on your end.</li>
-<li>Check the "Updated" time at the top. If it's old, the page is behind, not the weather.</li>
+<li>Check the "Updated" time at the top. If it's old, the page is behind, not the weather. More than 15 minutes old means something has stopped. Tell Derrik.</li>
 <li>Check the time buttons. Charts and tables show whatever range is picked. A quiet chart may just be Last 30 days when you wanted Today.</li>
 <li>Check the clock. Elgin is on Central time, Kingsburg on Pacific.</li>
 <li>Reload the page.</li>
@@ -382,6 +385,8 @@ details.sec[open]>summary{color:var(--storm);font-weight:600}
 <p><b>Radar.</b> A map that shows where rain and snow are falling.</p>
 <h3>Where the numbers come from</h3>
 <p>Current conditions are from three Acurite personal weather stations, collected through Weather Underground (the Right now readings every 5 minutes, the saved history every 15). The 5-day forecast and the hourly strip are the National Weather Service's. Alerts are the National Weather Service, checked every 5 minutes. Radar comes from the Iowa Environmental Mesonet, with RainViewer as a backup. Records are NOAA's. The snow estimate is Open-Meteo's weather model.</p>
+<h3>What runs behind the scenes</h3>
+<p>A small program, called the robot, runs on GitHub's computers every 5 minutes. It asks Weather Underground and the National Weather Service for the newest numbers, saves them, rebuilds the page and publishes it. GitHub's own timer turned out to be unreliable, so a free timer service at Cloudflare presses the robot's start button every 5 minutes instead. Nothing runs on Derrik's computer, so it can be turned off without the dashboard noticing.</p>
 </div></details>
 </div>
 
