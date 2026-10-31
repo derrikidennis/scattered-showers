@@ -35,7 +35,7 @@ concurrency:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - name: Get the code
@@ -65,10 +65,10 @@ jobs:
       - name: Set up Pages
         # skipped on a dry run, so a trial works before the Pages setting is switched
         if: ${{ github.event_name == 'schedule' || inputs.dry_run == false }}
-        uses: actions/configure-pages@v5
+        uses: actions/configure-pages@v6
 
       - name: Package the page
-        uses: actions/upload-pages-artifact@v4
+        uses: actions/upload-pages-artifact@v5
         with:
           path: site
 
@@ -76,7 +76,7 @@ jobs:
     needs: build
     # publish unless it is a dry run started by hand (timer runs always publish)
     if: ${{ github.event_name == 'schedule' || inputs.dry_run == false }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     environment:
       name: github-pages
@@ -84,4 +84,4 @@ jobs:
     steps:
       - name: Publish the page
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
