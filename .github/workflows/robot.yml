@@ -1,8 +1,8 @@
 # The robot's instructions. GitHub reads this file from .github/workflows/robot.yml (scr/publish.py copies it there).
 # One run = scr/robot.py (collect, build, check, save data) and then publish the page.
 #
-# Trial mode: this version has NO timer. It only starts when you press "Run workflow" on the Actions tab.
-# Step 7 turns the timer on by removing the # marks on the three "schedule" lines.
+# Timer is ON: runs every 5 minutes, and can still be started by hand with "Run workflow".
+# To turn the timer off: put # back in front of the three "schedule" lines (or Disable workflow on the Actions tab).
 
 name: Scattered Showers robot
 
@@ -21,9 +21,9 @@ on:
         description: "Start a new empty data branch if none exists (loses nothing only if you mean to start from scratch)"
         type: boolean
         default: false
-  # schedule:
-  #   # every 5 minutes. GitHub may run it late, or skip a run when it is busy; times are UTC.
-  #   - cron: "*/5 * * * *"
+  schedule:
+    # every 5 minutes. GitHub may run it late, or skip a run when it is busy; times are UTC.
+    - cron: "*/5 * * * *"
 
 permissions:
   contents: write   # save data to the data branch
