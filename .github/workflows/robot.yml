@@ -22,8 +22,8 @@ on:
         type: boolean
         default: false
   schedule:
-    # every 5 minutes. GitHub may run it late, or skip a run when it is busy; times are UTC.
-    - cron: "*/5 * * * *"
+    # every 5 minutes, at :03, :08, :13 ... (off the busy :00/:05 marks). GitHub may run it late, or skip a run when it is busy; times are UTC.
+    - cron: "3-58/5 * * * *"
 
 permissions:
   contents: write   # save data to the data branch
