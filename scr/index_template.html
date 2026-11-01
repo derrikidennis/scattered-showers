@@ -965,7 +965,8 @@ const RD_HRRR={ rain:[[214,239,208],[180,225,173],[115,196,118],[64,170,93],[17,
   snow:[[129,192,213],[78,166,196],[0,128,170],[0,102,153],[0,63,127],[0,38,110],[184,11,78],[229,53,146]],
   frzr:[[254,222,207],[252,194,170],[252,149,118],[251,120,88],[242,71,52],[222,43,37],[182,19,25],[148,11,19]],
   sleet:[[238,236,244],[222,221,237],[190,191,221],[169,167,207],[136,133,190],[118,105,175],[94,58,152],[78,28,138]] };
-const RD_RAMP={ 1:[[100,160,255],[180,215,255],[255,255,255]], 2:[[255,150,200],[255,60,160],[190,0,110]], 3:[[205,170,255],[150,95,235],[100,40,200]] };
+/* Snow runs pale to white on the dark map. On the light map white would vanish, so light mode runs soft blue to deep blue (heavier = darker). Rain, sleet and freezing rain are the same in both. */
+const RD_RAMP={ 1:IS_LIGHT?[[150,190,255],[70,125,225],[25,55,150]]:[[100,160,255],[180,215,255],[255,255,255]], 2:[[255,150,200],[255,60,160],[190,0,110]], 3:[[205,170,255],[150,95,235],[100,40,200]] };
 function rdDist(a,r,g,b){ const x=a[0]-r,y=a[1]-g,z=a[2]-b; return x*x+y*y+z*z; }
 function rdIsSnow(M,p){ const r=M[p],g=M[p+1],b=M[p+2], ds=rdDist(RD_MRMS_SNOW,r,g,b); if(ds>1600) return false;
   for(const c of RD_MRMS_OTHER) if(rdDist(c,r,g,b)<ds) return false; return true; }
@@ -1083,7 +1084,7 @@ function radarSection(s){
   const lg=el("div","rd-leg"); lg.style.display="none";
   function updateLegend(){ const f=inst.frames[inst.cur], ty=(f&&f.types)||{}; lg.textContent=""; if(!ty.snow&&!ty.frzr&&!ty.sleet){ lg.style.display="none"; return; }
     const row=(g,txt)=>{ const r=el("div"); const sw=el("span","sw"); sw.style.background=g; r.appendChild(sw); r.appendChild(document.createTextNode(txt)); lg.appendChild(r); };
-    if(ty.snow) row("linear-gradient(90deg,rgb(100,160,255),rgb(255,255,255))","Snow");
+    if(ty.snow) row("linear-gradient(90deg,rgb("+RD_RAMP[1][0].join(",")+"),rgb("+RD_RAMP[1][2].join(",")+"))","Snow");
     if(ty.frzr) row("linear-gradient(90deg,rgb(255,150,200),rgb(190,0,110))","Freezing rain");
     if(ty.sleet) row("linear-gradient(90deg,rgb(205,170,255),rgb(100,40,200))","Sleet");
     if(ty.frzr||ty.sleet) lg.appendChild(el("small",null,"Ice type is from a forecast model and can be off."));
@@ -1138,11 +1139,11 @@ function radarSection(s){
     L.control.attribution({prefix:false}).addTo(map);
     map.attributionControl.addAttribution('Radar: <a href="https://mesonet.agron.iastate.edu/" target="_blank" rel="noopener">Iowa Environmental Mesonet</a> (NWS NEXRAD). Precipitation type: NOAA MRMS and HRRR');
     map.attributionControl.addAttribution('&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions" target="_blank" rel="noopener">CARTO</a>');
-    if(CARTO_KEY) L.tileLayer("https://basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}.png?key="+CARTO_KEY,{maxNativeZoom:14,maxZoom:11,keepBuffer:0}).addTo(map);
+    if(CARTO_KEY) L.tileLayer("https://basemaps.cartocdn.com/rastertiles/"+(IS_LIGHT?"light_all":"dark_all")+"/{z}/{x}/{y}.png?key="+CARTO_KEY,{maxNativeZoom:14,maxZoom:11,keepBuffer:0}).addTo(map);
     else msg.textContent="The map key file (assets/carto_key.md) was not found when this page was built, so there is no base map under the radar.";
     { const LegCtl=L.Control.extend({ onAdd:function(){ L.DomEvent.disableClickPropagation(lg); return lg; } }); new LegCtl({position:"bottomleft"}).addTo(map); }
     map.createPane("radar").style.zIndex=250; map.createPane("alerts").style.zIndex=400; map.createPane("pins").style.zIndex=450;
-    L.circleMarker([s.lat,s.lon],{pane:"pins",radius:6,color:"#fff",weight:2,fillColor:color[s.id]||"#61ffca",fillOpacity:1}).addTo(map);
+    L.circleMarker([s.lat,s.lon],{pane:"pins",radius:6,color:IS_LIGHT?"#0F172A":"#fff",weight:2,fillColor:color[s.id]||"#61ffca",fillOpacity:1}).addTo(map);
     map.on("click",()=>{ if(!inst.fs) setFS(true); });
     exp.addEventListener("click",()=>setFS(!inst.fs));
     inst.onKey=e=>{ if(e.key==="Escape"&&inst.fs) setFS(false); }; document.addEventListener("keydown",inst.onKey);
@@ -1169,6 +1170,8 @@ function radarSection(s){
       const ids=(SH.stations&&SH.stations[s.id])||[], now=Date.now()/1000; let n=0, nw=0;
       ids.map(id=>SH.shapes&&SH.shapes[id]).filter(a=>a&&(!a.end||a.end>now)).sort((a,b)=>b.pri-a.pri).forEach(a=>{
         const hit=!!(a.hit&&a.hit[s.id]), watch=a.kind==="watch"; n++; if(watch) nw++;
+        /* light map: a thin dark edge under the outline so pale alert colors (yellow, cream, cyan) still show. The alert color itself is unchanged. */
+        if(IS_LIGHT) inst.alertLayer.addLayer(L.polygon(a.polys,{pane:"alerts",interactive:false,color:"#0F172A",opacity:.55,weight:(hit?3.5:(watch?1.5:2.2))+2.4,fill:false,dashArray:watch?"6 6":null}));
         const poly=L.polygon(a.polys,{pane:"alerts",bubblingMouseEvents:false,color:a.hex,weight:hit?3.5:(watch?1.5:2.2),fillColor:a.hex,fillOpacity:watch?0.05:0.14,dashArray:watch?"6 6":null});
         poly.on("click",e=>{ if(!inst.fs){ setFS(true); return; }
           const box=el("div"); box.appendChild(el("b",null,a.event)); if(hit) box.appendChild(el("div",null,"Your address is inside this one."));
@@ -1187,7 +1190,7 @@ function radarSection(s){
     buildFrames(); };
   inst.destroy=function(){ inst.dead=true; inst.timers.forEach(clearTimeout); inst.ints.forEach(clearInterval); if(inst.io) inst.io.disconnect(); if(inst.onKey) document.removeEventListener("keydown",inst.onKey); if(inst.fs) document.body.style.overflow=""; inst.frames.forEach(f=>{ if(f.layer){ f.layer.off(); try{ inst.map.removeLayer(f.layer); }catch(e){} } }); if(inst.map) inst.map.remove(); };
   RADAR=inst; requestAnimationFrame(()=>{ if(RADAR===inst) inst.init(); });
-  return section("Radar",c,"Radar from the Iowa Environmental Mesonet (National Weather Service NEXRAD), a new picture every 5 minutes. Click the map for full screen, then click an outline for details. Outlines are National Weather Service watches (dashed) and warnings (solid), colored by type. Snow shows in blue and white, freezing rain in pink and sleet in purple. Faint blue echoes and isolated specks are often not rain, so they are hidden unless they are snow or ice.");
+  return section("Radar",c,"Radar from the Iowa Environmental Mesonet (National Weather Service NEXRAD), a new picture every 5 minutes. Click the map for full screen, then click an outline for details. Outlines are National Weather Service watches (dashed) and warnings (solid), colored by type. Snow shows in "+(IS_LIGHT?"blue, deeper where it is heavier":"blue and white")+", freezing rain in pink and sleet in purple. Faint blue echoes and isolated specks are often not rain, so they are hidden unless they are snow or ice.");
 }
 
 function render(){
