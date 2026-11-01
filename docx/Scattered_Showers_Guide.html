@@ -410,7 +410,7 @@ details.sec[open]>summary{color:var(--storm);font-weight:600}
 <p><b>Outage.</b> A silence of more than 10 minutes between readings.</p>
 <p><b>Radar.</b> A map that shows where rain and snow are falling.</p>
 <h3>Where the numbers come from</h3>
-<p>Current conditions are from three Acurite personal weather stations, collected through Weather Underground (the Right now readings every 5 minutes, the saved history every 15). The 5-day forecast and the hourly strip are the National Weather Service's. Alerts are the National Weather Service, checked every 5 minutes. Radar comes from the Iowa Environmental Mesonet, with RainViewer as a backup. Records are NOAA's. The snow estimate is Open-Meteo's weather model.</p>
+<p>Current conditions are data provided by Weather Underground, from three Acurite personal weather stations (the Right now readings every 5 minutes, the saved history every 15). The 5-day forecast and the hourly strip are the National Weather Service's. Alerts are the National Weather Service, checked every 5 minutes. Radar comes from the Iowa Environmental Mesonet, with RainViewer as a backup. Records are NOAA's. The snow estimate is Open-Meteo's weather model.</p>
 <h3>What runs behind the scenes</h3>
 <p>A small program, called the robot, runs on GitHub's computers every 5 minutes. It asks Weather Underground and the National Weather Service for the newest numbers, saves them, rebuilds the page and publishes it. GitHub's own timer turned out to be unreliable, so a free timer service at Cloudflare presses the robot's start button every 5 minutes instead. Nothing runs on Derrik's computer, so it can be turned off without the dashboard noticing.</p>
 </div></details>

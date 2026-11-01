@@ -1199,12 +1199,12 @@ function render(){
   const main=document.getElementById("main"); main.replaceChildren(); hideTip();
   let draws=[];
   if(state.station==="all"){
-    const g=el("div","grid cards"); ST.forEach(s=>g.appendChild(stationCard(s))); main.appendChild(section("Right now",g,"Data provided by Acurite personal weather stations through Weather Underground."));
+    const g=el("div","grid cards"); ST.forEach(s=>g.appendChild(stationCard(s))); main.appendChild(section("Right now",g,"Data provided by Weather Underground. Stations are Acurite personal weather stations."));
     main.appendChild(section("Next 5 days",forecastTable(ST),"Forecast comes from the National Weather Service for each station's location, refreshed about once an hour. Chance of rain is the higher of the day and the night."));
     main.appendChild(section("Station reporting health",healthTable(ST),"An outage is any silence longer than 10 minutes between 5-minute readings. Outages are counted for the range picked at the top. Clear for is how long the station has reported without one, up to 30 days."));
   } else {
     const s=byId(state.station);
-    { const f=document.createDocumentFragment(); f.appendChild(alertsBlock(s)); f.appendChild(stationHead(s)); main.appendChild(section("Right now",f,"Data provided by Acurite personal weather stations through Weather Underground.")); }
+    { const f=document.createDocumentFragment(); f.appendChild(alertsBlock(s)); f.appendChild(stationHead(s)); main.appendChild(section("Right now",f,"Data provided by Weather Underground. Stations are Acurite personal weather stations.")); }
     const fc=(DATA.forecast[s.id]||{}).days||[];
     { const hsec=hourlySection(s); if(hsec) main.appendChild(hsec); }
     if(fc.length){ const g=el("div","grid fc"); fc.slice(0,5).forEach(d=>{ const c=card(); c.appendChild(wxIcon(d.icon)); c.appendChild(el("div","d",d.tonight?"Tonight":d.day)); const hl=el("div","hl",d.hi==null?"–":fmt0(d.hi)+"°"); hl.appendChild(el("small",null," / "+(d.lo==null?"–":fmt0(d.lo)+"°"))); c.appendChild(hl); c.appendChild(el("div",null,d.phrase||"")); c.appendChild(el("p",null,(d.rainChance==null?"":d.rainChance+"% chance of rain · ")+(d.wind!=null?"wind "+d.wind+" mph "+(d.windDir||""):""))); if(d.text) c.appendChild(el("p",null,d.text.replace(/ \./g,"."))); { const sl=sunLine(s,d.date,true); if(sl) c.appendChild(el("p",null,sl)); } g.appendChild(c); }); main.appendChild(section("Forecast",g,"Forecast comes from the National Weather Service for this station's location, refreshed about once an hour. Chance of rain is the higher of the day and the night.")); }
@@ -1267,7 +1267,7 @@ function init(){
   sel.addEventListener("change",()=>{ state.station=sel.value; state.metric="temp"; setHash(); status(); if(phone()) closePanel(); render(); });
   mk();
   document.getElementById("stationsLine").textContent=ST.map(short).join(" · ");
-  document.getElementById("foot").textContent="Source: Weather Underground personal weather station data, history collected every 15 minutes by wu_collect.py and saved in monthly CSV files, plus a live reading every 5 minutes for the Right now cards. Forecast: National Weather Service. Alerts: National Weather Service (api.weather.gov), checked every 5 minutes for each station's chosen address by wx_alerts.py. Pressure is the average of each 5-minute min and max, so it is rounded to 0.1 in. Right now cards use a live reading when it is newer than the saved history. Page built "+stamp(BUILT)+" "+zoneAbbr(BUILT)+" · history saved since "+((d)=>{const p=d.split("-"); return (+p[1])+"/"+(+p[2]);})(DATA.start)+".";
+  document.getElementById("foot").textContent="Data provided by Weather Underground (personal weather stations), history collected every 15 minutes by wu_collect.py and saved in monthly CSV files, plus a live reading every 5 minutes for the Right now cards. Forecast: National Weather Service. Alerts: National Weather Service (api.weather.gov), checked every 5 minutes for each station's chosen address by wx_alerts.py. Pressure is the average of each 5-minute min and max, so it is rounded to 0.1 in. Right now cards use a live reading when it is newer than the saved history. Page built "+stamp(BUILT)+" "+zoneAbbr(BUILT)+" · history saved since "+((d)=>{const p=d.split("-"); return (+p[1])+"/"+(+p[2]);})(DATA.start)+".";
   const view=restoreView();
   initRefresh();
   render();
