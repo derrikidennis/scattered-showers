@@ -1,0 +1,4 @@
+stationID,obsTimeUtc,obsTimeLocal,epoch,tz,lat,lon,solarRadiationHigh,uvHigh,winddirAvg,humidityHigh,humidityLow,humidityAvg,qcStatus,tempHigh,tempLow,tempAvg,windspeedHigh,windspeedLow,windspeedAvg,windgustHigh,windgustLow,windgustAvg,dewptHigh,dewptLow,dewptAvg,windchillHigh,windchillLow,windchillAvg,heatindexHigh,heatindexLow,heatindexAvg,pressureMax,pressureMin,pressureTrend,precipRate,precipTotal
+KTXELGIN136,2026-11-01T05:04:56Z,2026-11-01 00:04:56,1793509496,America/Chicago,30.353,-97.375,,4.0,107,90,90,90,1,68,67,67,0,0,0,0,0,0,65,64,64,68,67,67,68,67,67,29.53,29.53,0.0,0.0,0.0
+KTXELGIN136,2026-11-01T05:09:56Z,2026-11-01 00:09:56,1793509796,America/Chicago,30.353,-97.375,,4.0,107,91,90,90,1,67,67,67,0,0,0,0,0,0,64,64,64,67,67,67,67,67,67,29.53,29.53,0.0,0.0,0.0
+KTXELGIN136,2026-11-01T05:14:56Z,2026-11-01 00:14:56,1793510096,America/Chicago,30.353,-97.375,,4.0,109,91,91,91,1,67,67,67,0,0,0,0,0,0,64,64,64,67,67,67,67,67,67,29.53,29.53,0.0,0.0,0.0
