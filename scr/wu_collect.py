@@ -211,7 +211,8 @@ def save_live(stations_cfg, key, notes, history_done=True):
         if not isinstance(olddoc, dict):
             olddoc = {}
         old = olddoc.get("stations", {})
-        stations = dict(old)
+        ids = {st["id"] for st in stations_cfg}
+        stations = {k: v for k, v in old.items() if k in ids}   # drop stations no longer in stations.json (e.g. old KCAKINGS36)
         for st in stations_cfg:
             try:
                 r = fetch_live(st, key)
