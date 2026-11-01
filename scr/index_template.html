@@ -16,10 +16,10 @@ try{var t=localStorage.getItem("ss.theme");if(t==="light"||t==="dark")document.d
 <meta name="mobile-web-app-capable" content="yes">
 <style>/*__LEAFLET_CSS__*/</style>
 <style>
-:root{color-scheme:dark;--bg:#15141b;--card:#1c1b25;--card2:#232230;--ink:#edecee;--mute:#8f8ca3;--line:#2e2c3b;--grid:#2a2837;--mint:#61ffca;--gold:#ffca85;--hot:#ff6767;--pink:#f694ff;--cool:#82e2ff;--purple:#a277ff;--storm:#7aa2ff;--tipbg:#0f0e14;--ovl:rgba(21,20,27,.9);--shd:#0008;--mapbg:#0e0d13}
+:root{color-scheme:dark;--bg:#15141b;--card:#1c1b25;--card2:#232230;--ink:#edecee;--mute:#8f8ca3;--line:#2e2c3b;--grid:#2a2837;--mint:#61ffca;--gold:#ffca85;--hot:#ff6767;--pink:#f694ff;--cool:#82e2ff;--purple:#a277ff;--storm:#7aa2ff;--tipbg:#0f0e14;--ovl:rgba(21,20,27,.9);--shd:#0008;--mapbg:#0e0d13;--abd:transparent}
 /* Light mode: the device says light and nothing is chosen (Auto), or Light was chosen. Dark is the base above. */
-@media (prefers-color-scheme: light){:root:not([data-theme="dark"]){color-scheme:light;--bg:#F8FAFC;--card:#FFFFFF;--card2:#F1F5F9;--ink:#0F172A;--mute:#475569;--line:#E2E8F0;--grid:#E2E8F0;--mint:#0b7a60;--gold:#b45309;--hot:#c42b2b;--pink:#a21caf;--cool:#0369a1;--purple:#6d3fd1;--storm:#2563eb;--tipbg:#FFFFFF;--ovl:rgba(255,255,255,.92);--shd:rgba(15,23,42,.18);--mapbg:#e5e9ec}}
-:root[data-theme="light"]{color-scheme:light;--bg:#F8FAFC;--card:#FFFFFF;--card2:#F1F5F9;--ink:#0F172A;--mute:#475569;--line:#E2E8F0;--grid:#E2E8F0;--mint:#0b7a60;--gold:#b45309;--hot:#c42b2b;--pink:#a21caf;--cool:#0369a1;--purple:#6d3fd1;--storm:#2563eb;--tipbg:#FFFFFF;--ovl:rgba(255,255,255,.92);--shd:rgba(15,23,42,.18);--mapbg:#e5e9ec}
+@media (prefers-color-scheme: light){:root:not([data-theme="dark"]){color-scheme:light;--bg:#F8FAFC;--card:#FFFFFF;--card2:#F1F5F9;--ink:#0F172A;--mute:#475569;--line:#E2E8F0;--grid:#E2E8F0;--mint:#0b7a60;--gold:#b45309;--hot:#c42b2b;--pink:#a21caf;--cool:#0369a1;--purple:#6d3fd1;--storm:#2563eb;--tipbg:#FFFFFF;--ovl:rgba(255,255,255,.92);--shd:rgba(15,23,42,.18);--mapbg:#e5e9ec;--abd:rgba(15,23,42,.30)}}
+:root[data-theme="light"]{color-scheme:light;--bg:#F8FAFC;--card:#FFFFFF;--card2:#F1F5F9;--ink:#0F172A;--mute:#475569;--line:#E2E8F0;--grid:#E2E8F0;--mint:#0b7a60;--gold:#b45309;--hot:#c42b2b;--pink:#a21caf;--cool:#0369a1;--purple:#6d3fd1;--storm:#2563eb;--tipbg:#FFFFFF;--ovl:rgba(255,255,255,.92);--shd:rgba(15,23,42,.18);--mapbg:#e5e9ec;--abd:rgba(15,23,42,.30)}
 *{box-sizing:border-box}
 html,body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 "Inter",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
 body{padding:0 16px 48px}
@@ -127,7 +127,7 @@ th{color:var(--mute);font-weight:600;position:sticky;top:0;background:var(--card
 .apill{margin-left:auto;font:inherit;font-weight:600;font-size:12.5px;padding:3px 10px;border-radius:999px;border:0;white-space:nowrap;cursor:pointer}
 .alerts{margin:0 0 14px;display:grid;gap:8px}
 .alerts:empty{display:none}
-.alertbox{border-radius:10px;overflow:hidden}
+.alertbox{border-radius:10px;overflow:hidden;box-shadow:0 0 0 1px var(--abd)}   /* light mode: a thin edge so pale banners (yellow, cream, cyan) show on a white page */
 .alertbox summary{cursor:pointer;padding:10px 14px;font-weight:700;list-style:none;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
 .alertbox summary::-webkit-details-marker{display:none}
 .alertbox .at{font-weight:500;font-size:13px;opacity:.92}
