@@ -7,13 +7,19 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
-<meta name="theme-color" content="#15141b">
+<script>/* Theme: apply a saved Light or Dark choice before anything paints, so there is no flash. No saved choice = Auto = follow the device (plain CSS below). */
+try{var t=localStorage.getItem("ss.theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t);}catch(e){}</script>
+<meta name="theme-color" content="#15141b" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#F8FAFC" media="(prefers-color-scheme: light)">
 <meta name="apple-mobile-web-app-title" content="Sct Shwrs">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <style>/*__LEAFLET_CSS__*/</style>
 <style>
-:root{color-scheme:dark;--bg:#15141b;--card:#1c1b25;--card2:#232230;--ink:#edecee;--mute:#8f8ca3;--line:#2e2c3b;--grid:#2a2837;--mint:#61ffca;--gold:#ffca85;--hot:#ff6767;--pink:#f694ff;--cool:#82e2ff;--purple:#a277ff;--storm:#7aa2ff}
+:root{color-scheme:dark;--bg:#15141b;--card:#1c1b25;--card2:#232230;--ink:#edecee;--mute:#8f8ca3;--line:#2e2c3b;--grid:#2a2837;--mint:#61ffca;--gold:#ffca85;--hot:#ff6767;--pink:#f694ff;--cool:#82e2ff;--purple:#a277ff;--storm:#7aa2ff;--tipbg:#0f0e14;--ovl:rgba(21,20,27,.9);--shd:#0008;--mapbg:#0e0d13}
+/* Light mode: the device says light and nothing is chosen (Auto), or Light was chosen. Dark is the base above. */
+@media (prefers-color-scheme: light){:root:not([data-theme="dark"]){color-scheme:light;--bg:#F8FAFC;--card:#FFFFFF;--card2:#F1F5F9;--ink:#0F172A;--mute:#475569;--line:#E2E8F0;--grid:#E2E8F0;--mint:#0b7a60;--gold:#b45309;--hot:#c42b2b;--pink:#a21caf;--cool:#0369a1;--purple:#6d3fd1;--storm:#2563eb;--tipbg:#FFFFFF;--ovl:rgba(255,255,255,.92);--shd:rgba(15,23,42,.18);--mapbg:#e5e9ec}}
+:root[data-theme="light"]{color-scheme:light;--bg:#F8FAFC;--card:#FFFFFF;--card2:#F1F5F9;--ink:#0F172A;--mute:#475569;--line:#E2E8F0;--grid:#E2E8F0;--mint:#0b7a60;--gold:#b45309;--hot:#c42b2b;--pink:#a21caf;--cool:#0369a1;--purple:#6d3fd1;--storm:#2563eb;--tipbg:#FFFFFF;--ovl:rgba(255,255,255,.92);--shd:rgba(15,23,42,.18);--mapbg:#e5e9ec}
 *{box-sizing:border-box}
 html,body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 "Inter",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
 body{padding:0 16px 48px}
@@ -71,7 +77,7 @@ h2{font-size:15px;margin:30px 0 10px;font-weight:650;color:var(--ink)}
 svg:not(.leaflet-container svg){display:block;width:100%;height:auto;overflow:visible}
 svg text{fill:var(--mute);font-size:11px}
 svg .lbl{font-size:11.5px;fill:var(--ink)}
-.tip{position:absolute;pointer-events:none;background:#0f0e14;border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:12px;min-width:150px;box-shadow:0 6px 20px #0008;z-index:4;display:none}
+.tip{position:absolute;pointer-events:none;background:var(--tipbg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:12px;min-width:150px;box-shadow:0 6px 20px var(--shd);z-index:4;display:none}
 .tip .t{color:var(--mute);margin-bottom:4px}
 .tip .r{display:flex;align-items:center;gap:8px;justify-content:space-between}
 .tip .r em{font-style:normal;display:inline-flex;align-items:center;gap:6px;color:var(--mute)}
@@ -103,12 +109,14 @@ th{color:var(--mute);font-weight:600;position:sticky;top:0;background:var(--card
 .actions .stat .upd{white-space:nowrap}
 .actions .stat .upd.warn{white-space:normal}
 .actions .btns{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+#themeSeg{position:absolute;left:0;top:26px}
+#themeSeg button{padding:5px 12px;font-size:13px}
 #refreshMsg{text-align:right}
 /* the header grows only while a long note is showing, so nothing slides behind the header line */
 .masthead:has(#refreshMsg:not(:empty)){padding-bottom:54px}
 .masthead:has(.upd.warn){padding-bottom:56px}
 .masthead:has(#refreshMsg:not(:empty)):has(.upd.warn){padding-bottom:96px}
-@media(max-width:900px){.actions{position:static;max-width:none;align-items:center;margin:12px 0 0}.actions .stat{justify-content:center;text-align:center}#refreshMsg{text-align:center}
+@media(max-width:900px){#themeSeg{position:static;margin-top:10px}.actions{position:static;max-width:none;align-items:center;margin:12px 0 0}.actions .stat{justify-content:center;text-align:center}#refreshMsg{text-align:center}
   .masthead:has(#refreshMsg:not(:empty)),.masthead:has(.upd.warn),.masthead:has(#refreshMsg:not(:empty)):has(.upd.warn){padding-bottom:16px}}
 .act{background:var(--card2);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:8px 14px;font:inherit;cursor:pointer}
 @media (hover:hover){.act:hover{border-color:var(--purple)}}
@@ -146,10 +154,10 @@ footer{margin-top:36px;color:var(--mute);font-size:12.5px;border-top:1px solid v
 .fpanel{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
 .fbtn{display:none}
 .datewrap{position:relative}
-.datepop{display:none;position:absolute;left:0;top:calc(100% + 6px);z-index:6;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px;gap:12px;flex-wrap:wrap;align-items:flex-end;min-width:280px;box-shadow:0 6px 20px #0008}
+.datepop{display:none;position:absolute;left:0;top:calc(100% + 6px);z-index:6;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px;gap:12px;flex-wrap:wrap;align-items:flex-end;min-width:280px;box-shadow:0 6px 20px var(--shd)}
 .datepop.open{display:flex}
 .datepop label{display:flex;flex-direction:column;gap:4px;color:var(--mute);font-size:12px}
-input[type=date]{background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font:inherit;color-scheme:dark}
+input[type=date]{background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font:inherit}
 input[type=date]:focus-visible{outline:2px solid var(--cool);outline-offset:2px}
 .seg button[aria-pressed=false].on{color:var(--ink)}
 .scroll.tall{max-height:640px}
@@ -176,7 +184,7 @@ input[type=date]:focus-visible{outline:2px solid var(--cool);outline-offset:2px}
 }
 
 /* ---- radar ---- */
-.leaflet-container{background:#0e0d13;font:inherit}
+.leaflet-container{background:var(--mapbg);font:inherit}
 .rd .rd-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px}
 .rd .rd-head h3{margin:0;font-size:16px}
 .rd .rd-time{color:var(--mute);font-size:13.5px}
@@ -200,7 +208,7 @@ input[type=date]:focus-visible{outline:2px solid var(--cool);outline-offset:2px}
 .card.rd.fs{position:fixed;inset:0;z-index:1000;border-radius:0;display:flex;flex-direction:column;padding:12px;margin:0}
 .rd.fs .rd-map{flex:1;height:auto;border-radius:0}
 .rd .rd-msg{color:var(--gold);font-size:12.5px;margin-top:8px}
-.leaflet-control-attribution{background:rgba(21,20,27,.85)!important;color:var(--mute)!important;font-size:11px}
+.leaflet-control-attribution{background:var(--ovl)!important;color:var(--mute)!important;font-size:11px}
 .leaflet-control-attribution a{color:var(--cool)!important}
 /* ---- the animation. Each effect is slow and small. Everything stops under "reduce motion" or the button ---- */
 .ic .rays{transform-box:fill-box;transform-origin:center;animation:rd-spin 40s linear infinite}
@@ -221,7 +229,7 @@ input[type=date]:focus-visible{outline:2px solid var(--cool);outline-offset:2px}
 @keyframes rd-slide{from{transform:translateX(-2px)}to{transform:translateX(2px)}}
 .still .ic *{animation:none!important}
 @media (prefers-reduced-motion:reduce){.ic *{animation:none!important}}
-.rd-leg{background:rgba(21,20,27,.9);border:1px solid var(--line);border-radius:6px;padding:6px 9px;font-size:12px;color:var(--ink);line-height:1.5}
+.rd-leg{background:var(--ovl);border:1px solid var(--line);border-radius:6px;padding:6px 9px;font-size:12px;color:var(--ink);line-height:1.5}
 .rd-leg .sw{display:inline-block;width:28px;height:9px;border-radius:2px;margin-right:7px;vertical-align:middle}
 .rd-leg small{display:block;color:var(--mute);margin-top:2px;font-size:11px}
 .leaflet-tooltip{background:var(--card);color:var(--ink);border:1px solid var(--line)}
@@ -234,6 +242,7 @@ input[type=date]:focus-visible{outline:2px solid var(--cool);outline-offset:2px}
 <div class="masthead">
   <h1>Scattered Showers</h1>
   <div class="sub" id="stationsLine"></div>
+  <div class="seg" id="themeSeg" role="group" aria-label="Theme"><button type="button" data-t="auto" aria-pressed="false">Auto</button><button type="button" data-t="light" aria-pressed="false">Light</button><button type="button" data-t="dark" aria-pressed="false">Dark</button></div>
   <div class="actions"><div class="btns"><button class="act" id="guideBtn" type="button">How To Guide</button><button class="act" id="refreshBtn" type="button">&#x21BB; Refresh data</button></div><div class="stat"><span id="alertAt" class="upd"></span><span id="updAt" class="upd"></span></div><span id="refreshMsg" role="status"></span></div>
 </div>
 <header>
@@ -264,6 +273,19 @@ const NS = "http://www.w3.org/2000/svg";
 const RANGES = [["today","Today"],["24h","Last 24 hours"],["7d","Last 7 days"],["30d","Last 30 days"],["all","Everything saved"]];
 const state = {station:"all", range:"today", from:null, to:null, metric:"temp"};
 const tipEl = document.getElementById("tip");
+/* ---------- theme: Auto follows the device, Light and Dark are saved choices (per device) ---------- */
+const THEME_KEY="ss.theme", THEME_BG={dark:"#15141b",light:"#F8FAFC"};
+const THEME_MQ=window.matchMedia?matchMedia("(prefers-color-scheme: light)"):null;
+const THEME_CHOICE=(function(){ try{ const t=localStorage.getItem(THEME_KEY); if(t==="light"||t==="dark") return t; }catch(e){} return "auto"; })();
+const IS_LIGHT=THEME_CHOICE==="light"||(THEME_CHOICE==="auto"&&!!(THEME_MQ&&THEME_MQ.matches));   /* the drawn parts (charts, dials, icons, radar) read this */
+function setTheme(t){ try{ if(t==="auto") localStorage.removeItem(THEME_KEY); else localStorage.setItem(THEME_KEY,t); }catch(e){} saveView(); location.reload(); }
+(function themeInit(){
+  document.querySelectorAll('meta[name="theme-color"]').forEach(m=>{ const light=/light/.test(m.getAttribute("media")||""); m.setAttribute("content",THEME_CHOICE==="auto"?(light?THEME_BG.light:THEME_BG.dark):THEME_BG[THEME_CHOICE]); });
+  const seg=document.getElementById("themeSeg");
+  if(seg) seg.querySelectorAll("button").forEach(b=>{ b.setAttribute("aria-pressed",b.dataset.t===THEME_CHOICE?"true":"false"); b.addEventListener("click",()=>{ if(b.dataset.t!==THEME_CHOICE) setTheme(b.dataset.t); }); });
+  if(THEME_CHOICE==="auto"&&THEME_MQ){ const chg=()=>{ if(THEME_MQ.matches!==IS_LIGHT){ saveView(); location.reload(); } };
+    if(THEME_MQ.addEventListener) THEME_MQ.addEventListener("change",chg); else if(THEME_MQ.addListener) THEME_MQ.addListener(chg); }   /* device flips at sunset: follow it */
+})();
 const ST = DATA.stations;
 /* A live reading (saved by the collector) replaces the Right now numbers only when it is newer than the newest saved history reading. */
 function feelsFrom(t,w,hi,wc){ if(t!=null&&t>=80&&hi!=null) return hi; if(t!=null&&t<=50&&(w||0)>3&&wc!=null) return wc; return t; }
