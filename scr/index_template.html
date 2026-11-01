@@ -310,7 +310,11 @@ function feelsFrom(t,w,hi,wc){ if(t!=null&&t>=80&&hi!=null) return hi; if(t!=nul
     s.liveUsed=true;
   });
 })();
-const color = {}; ST.forEach((s,i)=>color[s.id]=DATA.colors[i%DATA.colors.length]);
+/* Station colors. Dark mode uses DATA.colors (build_dashboard.py). Light mode uses deeper versions of the same three hues (purple, red, green), picked 2026-10-31. */
+const LIGHT_COLORS=["#7a4be0","#d13b3b","#0e9373"];
+const STATION_COLORS=IS_LIGHT?LIGHT_COLORS:DATA.colors;
+const SNOW_FILL=IS_LIGHT?"#94a3b8":"#f4f6fb", SNOW_AXIS=IS_LIGHT?"#64748b":"#f4f6fb", DASH_LINE=IS_LIGHT?"#94a3b8":"#b5b2c4";   /* snow bars and axis, and the dashed second line */
+const color = {}; ST.forEach((s,i)=>color[s.id]=STATION_COLORS[i%STATION_COLORS.length]);
 const short = s => { let l=s.label; const m=l.match(/\(([^)]+)\)/); if(m) l=m[1]; return l.replace(/,\s*[A-Z]{2}$/,""); };
 const byId = id => ST.find(s=>s.id===id);
 const NOW = Math.max(...ST.map(s=>s.latest.epoch));
@@ -475,7 +479,7 @@ function barChart(host, o){
   const Y=v=>m.t+(1-v/y1)*(H-m.t-m.b), YR=v=>m.t+(1-v/y2)*(H-m.t-m.b);
   const svg=sv("svg",{viewBox:`0 0 ${W} ${H}`,role:"img","aria-label":o.title});
   ntL.ticks.forEach(v=>{ svg.appendChild(sv("line",{x1:m.l,x2:W-m.r,y1:Y(v),y2:Y(v),stroke:"var(--grid)"})); const t=sv("text",{x:m.l-8,y:Y(v)+4,"text-anchor":"end"}); t.textContent=(v%1?v.toFixed(2):v); svg.appendChild(t); });
-  if(hasR) ntR.ticks.forEach(v=>{ const t=sv("text",{x:W-m.r+8,y:YR(v)+4,"text-anchor":"start",fill:"#f4f6fb"}); t.textContent=(v%1?v.toFixed(1):v); svg.appendChild(t); });
+  if(hasR) ntR.ticks.forEach(v=>{ const t=sv("text",{x:W-m.r+8,y:YR(v)+4,"text-anchor":"start",fill:SNOW_AXIS}); t.textContent=(v%1?v.toFixed(1):v); svg.appendChild(t); });
   const n=o.cats.length, gw=(W-m.l-m.r)/n, k=o.series.length, bw=Math.max(3,Math.min(26,(gw*0.72-(k-1)*2)/k));
   o.cats.forEach((c,ci)=>{
     const act=o.series.map((s,i)=>(s.vals[ci]||0)>0?i:-1).filter(i=>i>=0);   // only series with a value that day are drawn, centered
@@ -521,8 +525,8 @@ function tableHourly(stations, idx, f){
 }
 function dual(s, title, i1, n1, i2, n2, unit){
   const c=color[s.id];
-  return chartCard({title:title,legend:[{name:n1,color:c},{name:n2,color:"#b5b2c4",dash:true}],
-    spec:()=>({title:title,unit:unit,tz:s.tz,gap:gapSec(s),series:[{name:n1,short:n1,color:c,pts:pointsFor(s,i1)},{name:n2,short:n2,color:"#b5b2c4",dash:true,pts:pointsFor(s,i2)}]}),
+  return chartCard({title:title,legend:[{name:n1,color:c},{name:n2,color:DASH_LINE,dash:true}],
+    spec:()=>({title:title,unit:unit,tz:s.tz,gap:gapSec(s),series:[{name:n1,short:n1,color:c,pts:pointsFor(s,i1)},{name:n2,short:n2,color:DASH_LINE,dash:true,pts:pointsFor(s,i2)}]}),
     table:{head:["Hour ("+short(s)+" time)",n1+" ("+unit.trim()+")",n2+" ("+unit.trim()+")"],rows:()=>{ const w=win(s); return s.hourly.filter(r=>r[0]>=w.a && r[0]<w.b).sort((x,y)=>y[0]-x[0]).slice(0,300).map(r=>[stamp(r[0],s.tz),fmt1(r[i1]),fmt1(r[i2])]); }}});
 }
 function single(s, title, idx, unit, o){
@@ -532,7 +536,7 @@ function single(s, title, idx, unit, o){
     table:{head:["Hour ("+short(s)+" time)",title+" ("+unit.trim()+")"],rows:()=>tableHourly([s],idx,o.valFmt||fmt1)}});
 }
 function dailyRain(stations){
-  const title="Precipitation per day", SNOWC="#f4f6fb";
+  const title="Precipitation per day", SNOWC=SNOW_FILL;
   const dates=[...new Set(stations.flatMap(s=>dailyFor(s).map(d=>d.date)))].sort();
   const dayOf=(s,dt)=>s.daily.find(x=>x.date===dt);
   const val=(s,dt)=>{ const d=dayOf(s,dt); return d?d.rain:0; };
@@ -551,7 +555,7 @@ function dailyRain(stations){
   return chartCard({title:title,kind:"bar",legend:legendItems,forceLegend:withSnow.length>0,
     spec:()=>({title:title,cats:dates,series:series,tip:stations.length!==1?null:(ci=>{
       const s=stations[0], dt=dates[ci], r=val(s,dt)||0, sn=snowOf(s,dt), rows=[{name:"Rain gauge",color:color[s.id],value:fmt2(r)+" in"}];
-      if(sn>0){ rows.push({name:"Snow (model estimate)",color:SNOWC,value:snowStr(sn)+" in"}); rows.push({name:"Water total",color:"#b5b2c4",value:fmt2(r+sn/SNOW_PER_WATER)+" in"}); }
+      if(sn>0){ rows.push({name:"Snow (model estimate)",color:SNOWC,value:snowStr(sn)+" in"}); rows.push({name:"Water total",color:DASH_LINE,value:fmt2(r+sn/SNOW_PER_WATER)+" in"}); }
       return rows; })}),
     table:{head:["Date",...stations.flatMap(s=>[short(s)+" rain (in)",...(withSnow.includes(s)?[short(s)+" snow (in)"]:[])])],
       rows:()=>[...dates].reverse().map(dt=>[mdy(dt),...stations.flatMap(s=>[fmt2(val(s,dt)),...(withSnow.includes(s)?[snowStr(snowOf(s,dt))]:[])])])}});
@@ -800,7 +804,11 @@ const offDial=(...vs)=>{ const v=vs.filter(x=>x!=null); return v.some(x=>x<TEMP_
 function arcPt(cx,cy,r,f){ const a=Math.PI*(1-f); return [cx+r*Math.cos(a), cy-r*Math.sin(a)]; }
 function arcPath(cx,cy,r,f0,f1){ const a=arcPt(cx,cy,r,f0), b=arcPt(cx,cy,r,f1); return `M${a[0].toFixed(1)} ${a[1].toFixed(1)}A${r} ${r} 0 0 1 ${b[0].toFixed(1)} ${b[1].toFixed(1)}`; }
 function gzSvg(label){ const g=sv("svg",{viewBox:"0 0 120 84",class:"gz",role:"img","aria-label":label}); return g; }
-const TEMP_STOPS=[[0,"#82e2ff"],[0.42,"#61ffca"],[0.7,"#ffca85"],[1,"#ff6767"]];
+/* Dial, gauge and icon colors. Dark values are the originals. Light values are deeper so they read on white; the dial green and red match the station green and red. */
+const RAIN_BLUE=IS_LIGHT?"#0284c7":"#82e2ff", DIAL_DOT=IS_LIGHT?"#0F172A":"#edecee", DIAL_RING=IS_LIGHT?"#ffffff":"#232230", NEEDLE=IS_LIGHT?"#d13b3b":"#ff6767";
+const TEMP_STOPS=IS_LIGHT?[[0,"#0284c7"],[0.42,"#0e9373"],[0.7,"#d97706"],[1,"#d13b3b"]]:[[0,"#82e2ff"],[0.42,"#61ffca"],[0.7,"#ffca85"],[1,"#ff6767"]];
+const IC_LIGHT={"#ffca85":"#f59e0b","#d9d6ec":"#7b8bbd","#c9c6d8":"#94a3b8","#9b98b0":"#64748b","#8f8ca3":"#64748b","#b5b2c4":"#94a3b8","#7e7b94":"#475569","#82e2ff":"#0284c7","#edecee":"#94a3b8"};
+const ic=h=>IS_LIGHT?(IC_LIGHT[h.toLowerCase()]||h):h;                       /* weather icon colors: dark = as drawn, light = deeper swap */
 function mixHex(a,b,t){ const p=h=>[1,3,5].map(i=>parseInt(h.slice(i,i+2),16)); const x=p(a), y=p(b); return "#"+x.map((v,i)=>Math.round(v+(y[i]-v)*t).toString(16).padStart(2,"0")).join(""); }
 function tempColor(v){
   if(v==null) return "var(--ink)";
@@ -817,8 +825,8 @@ function tempArc(svg,id,val,lo,hi){
     svg.appendChild(sv("path",{d:arcPath(cx,cy,r,f(lo),Math.max(f(hi),f(lo)+0.02)),fill:"none",stroke:"url(#"+id+")","stroke-width":9,"stroke-linecap":"round"}));
   } else if(val!=null){
     svg.appendChild(sv("path",{d:arcPath(cx,cy,r,0,1),fill:"none",stroke:"url(#"+id+")","stroke-width":9,"stroke-linecap":"round"}));
-    const off=val<TEMP_MIN?"#82e2ff":val>TEMP_MAX?"#ff6767":null;
-    const m=arcPt(cx,cy,r,f(val)); svg.appendChild(sv("circle",{cx:m[0],cy:m[1],r:off?7:6,fill:"#edecee",stroke:off||"#232230","stroke-width":off?4:2.5}));
+    const off=val<TEMP_MIN?TEMP_STOPS[0][1]:val>TEMP_MAX?TEMP_STOPS[TEMP_STOPS.length-1][1]:null;
+    const m=arcPt(cx,cy,r,f(val)); svg.appendChild(sv("circle",{cx:m[0],cy:m[1],r:off?7:6,fill:DIAL_DOT,stroke:off||DIAL_RING,"stroke-width":off?4:2.5}));
   }
   [[0,String(TEMP_MIN)],[1,String(TEMP_MAX)]].forEach(([ff,t])=>{ const p=arcPt(cx,cy,r,ff); const tx=sv("text",{x:p[0],y:p[1]+14,"text-anchor":"middle"}); tx.textContent=t; svg.appendChild(tx); });
 }
@@ -830,26 +838,26 @@ function gaugeFor(s,k){
   else if(k==="hum"){
     const c=2*Math.PI*34, f=clamp01((L.hum||0)/100);
     svg.appendChild(sv("circle",{cx:60,cy:44,r:34,fill:"none",stroke:"var(--line)","stroke-width":9}));
-    svg.appendChild(sv("circle",{cx:60,cy:44,r:34,fill:"none",stroke:"#82e2ff","stroke-width":9,"stroke-linecap":"round","stroke-dasharray":(c*f).toFixed(1)+" "+c.toFixed(1),transform:"rotate(-90 60 44)"}));
+    svg.appendChild(sv("circle",{cx:60,cy:44,r:34,fill:"none",stroke:RAIN_BLUE,"stroke-width":9,"stroke-linecap":"round","stroke-dasharray":(c*f).toFixed(1)+" "+c.toFixed(1),transform:"rotate(-90 60 44)"}));
   } else if(k==="wind"){
     svg.appendChild(sv("circle",{cx:60,cy:46,r:29,fill:"none",stroke:"var(--line)","stroke-width":2}));
     for(let i=0;i<16;i++){ const a=i*22.5*Math.PI/180, r0=i%4===0?24:26.5, r1=29; svg.appendChild(sv("line",{x1:60+r0*Math.sin(a),y1:46-r0*Math.cos(a),x2:60+r1*Math.sin(a),y2:46-r1*Math.cos(a),stroke:"var(--mute)","stroke-width":i%4===0?1.6:1})); }
     [["N",0],["E",90],["S",180],["W",270]].forEach(([t,d])=>{ const a=d*Math.PI/180; const tx=sv("text",{x:60+38*Math.sin(a),y:46-38*Math.cos(a)+3,"text-anchor":"middle"}); tx.textContent=t; svg.appendChild(tx); });
-    if(L.dir!=null){ const g=sv("g",{transform:`rotate(${L.dir} 60 46)`}); g.appendChild(sv("path",{d:"M60 33L55.5 21L64.5 21Z",fill:"#edecee"})); svg.appendChild(g); }
+    if(L.dir!=null){ const g=sv("g",{transform:`rotate(${L.dir} 60 46)`}); g.appendChild(sv("path",{d:"M60 33L55.5 21L64.5 21Z",fill:DIAL_DOT})); svg.appendChild(g); }
   } else if(k==="press"){
     const cx=60,cy=70,r=46, f=clamp01(((L.press||29)-28.5)/3);
     svg.appendChild(sv("path",{d:arcPath(cx,cy,r,0,1),fill:"none",stroke:"var(--line)","stroke-width":7,"stroke-linecap":"round"}));
     for(let i=0;i<=6;i++){ const a=arcPt(cx,cy,r-7,i/6), b=arcPt(cx,cy,r-12,i/6); svg.appendChild(sv("line",{x1:a[0],y1:a[1],x2:b[0],y2:b[1],stroke:"var(--mute)","stroke-width":1})); }
-    const n=arcPt(cx,cy,r-6,f); svg.appendChild(sv("line",{x1:cx,y1:cy,x2:n[0],y2:n[1],stroke:"#ff6767","stroke-width":2.5,"stroke-linecap":"round"}));
-    svg.appendChild(sv("circle",{cx:cx,cy:cy,r:4,fill:"#edecee"}));
+    const n=arcPt(cx,cy,r-6,f); svg.appendChild(sv("line",{x1:cx,y1:cy,x2:n[0],y2:n[1],stroke:NEEDLE,"stroke-width":2.5,"stroke-linecap":"round"}));
+    svg.appendChild(sv("circle",{cx:cx,cy:cy,r:4,fill:DIAL_DOT}));
     [[0,"28.5"],[1,"31.5"]].forEach(([ff,t])=>{ const p=arcPt(cx,cy,r,ff); const tx=sv("text",{x:p[0],y:p[1]+14,"text-anchor":"middle"}); tx.textContent=t; svg.appendChild(tx); });
   } else if(k==="rain"){
     const top=8, h=68, pp=precipParts(s), total=pp.water||0, scale=Math.max(0.5,total*1.25);
     const fr=clamp01((pp.rain||0)/scale), fs=clamp01((pp.showSnow?pp.snow/SNOW_PER_WATER:0)/scale);
     const cp=sv("clipPath",{id:"tubeclip"}); cp.appendChild(sv("rect",{x:46,y:top,width:28,height:h,rx:10})); const d=sv("defs"); d.appendChild(cp); svg.appendChild(d);
     svg.appendChild(sv("rect",{x:46,y:top,width:28,height:h,rx:10,fill:"var(--line)",opacity:.5}));
-    if(fr>0) svg.appendChild(sv("rect",{x:46,y:top+h*(1-fr),width:28,height:h*fr,fill:"#82e2ff","clip-path":"url(#tubeclip)"}));
-    if(fs>0) svg.appendChild(sv("rect",{x:46,y:top+h*(1-fr-fs),width:28,height:h*fs,fill:"#f4f6fb","clip-path":"url(#tubeclip)"}));
+    if(fr>0) svg.appendChild(sv("rect",{x:46,y:top+h*(1-fr),width:28,height:h*fr,fill:RAIN_BLUE,"clip-path":"url(#tubeclip)"}));
+    if(fs>0) svg.appendChild(sv("rect",{x:46,y:top+h*(1-fr-fs),width:28,height:h*fs,fill:SNOW_FILL,"clip-path":"url(#tubeclip)"}));
     svg.appendChild(sv("rect",{x:46,y:top,width:28,height:h,rx:10,fill:"none",stroke:"var(--mute)","stroke-width":1.5}));
     for(let i=1;i<4;i++) svg.appendChild(sv("line",{x1:74,x2:80,y1:top+h*i/4,y2:top+h*i/4,stroke:"var(--mute)","stroke-width":1}));
   }
@@ -876,23 +884,23 @@ function iconKind(code){
 function wxIcon(code){
   const k=iconKind(code), svg=sv("svg",{viewBox:"0 0 48 48",class:"ic",role:"img","aria-label":k});
   const add=(tag,a,parent)=>{ const e=sv(tag,a); (parent||svg).appendChild(e); return e; };
-  const cloud=(dx,dy,fill,cls)=>{ const g=add("g",{class:"cl"+(cls?" "+cls:"")}); add("path",{d:"M14 36a7 7 0 0 1-1-14 10 10 0 0 1 19.5-2A8 8 0 0 1 35 36z",transform:`translate(${dx} ${dy})`,fill:fill||"#b5b2c4"},g); };
-  const sun=(cx,cy,r,rays)=>{ add("circle",{cx:cx,cy:cy,r:r,fill:"#ffca85"}); if(rays){ const g=add("g",{class:"rays"}); for(let i=0;i<8;i++){ const a=i*Math.PI/4, r0=r+3, r1=r+7; add("line",{x1:cx+r0*Math.cos(a),y1:cy+r0*Math.sin(a),x2:cx+r1*Math.cos(a),y2:cy+r1*Math.sin(a),stroke:"#ffca85","stroke-width":2.5,"stroke-linecap":"round"},g); } } };
-  const moon=(dx,dy,sc)=>add("path",{class:"moon",d:"M28 8a14 14 0 1 0 12 22 11.5 11.5 0 0 1-12-22z",fill:"#d9d6ec",transform:`translate(${dx} ${dy}) scale(${sc})`});
-  const drop=(x1,y1,x2,y2,i)=>add("line",{class:"drop",style:`animation-delay:${-i*0.33}s`,x1:x1,y1:y1,x2:x2,y2:y2,stroke:"#82e2ff","stroke-width":2.6,"stroke-linecap":"round"});
-  const flake=(x,y,i)=>add("circle",{class:"flake",style:`animation-delay:${-i*1.05}s`,cx:x,cy:y,r:2.4,fill:"#edecee"});
+  const cloud=(dx,dy,fill,cls)=>{ const g=add("g",{class:"cl"+(cls?" "+cls:"")}); add("path",{d:"M14 36a7 7 0 0 1-1-14 10 10 0 0 1 19.5-2A8 8 0 0 1 35 36z",transform:`translate(${dx} ${dy})`,fill:fill||ic("#b5b2c4")},g); };
+  const sun=(cx,cy,r,rays)=>{ add("circle",{cx:cx,cy:cy,r:r,fill:ic("#ffca85")}); if(rays){ const g=add("g",{class:"rays"}); for(let i=0;i<8;i++){ const a=i*Math.PI/4, r0=r+3, r1=r+7; add("line",{x1:cx+r0*Math.cos(a),y1:cy+r0*Math.sin(a),x2:cx+r1*Math.cos(a),y2:cy+r1*Math.sin(a),stroke:ic("#ffca85"),"stroke-width":2.5,"stroke-linecap":"round"},g); } } };
+  const moon=(dx,dy,sc)=>add("path",{class:"moon",d:"M28 8a14 14 0 1 0 12 22 11.5 11.5 0 0 1-12-22z",fill:ic("#d9d6ec"),transform:`translate(${dx} ${dy}) scale(${sc})`});
+  const drop=(x1,y1,x2,y2,i)=>add("line",{class:"drop",style:`animation-delay:${-i*0.33}s`,x1:x1,y1:y1,x2:x2,y2:y2,stroke:ic("#82e2ff"),"stroke-width":2.6,"stroke-linecap":"round"});
+  const flake=(x,y,i)=>add("circle",{class:"flake",style:`animation-delay:${-i*1.05}s`,cx:x,cy:y,r:2.4,fill:ic("#edecee")});
   const drops=(n)=>{ for(let i=0;i<n;i++){ const x=25.7+(i-(n-1)/2)*7; drop(x,39,x-3,46,i); } };   /* centered on the cloud (its middle is x 24.2) */
   if(k==="sun") sun(24,24,9,true);
   else if(k==="moon") moon(0,2,1);
-  else if(k==="partday"){ sun(17,17,7,true); cloud(4,-2,"#c9c6d8"); }
-  else if(k==="partnight"){ moon(-6,-6,0.7); cloud(4,-2,"#9b98b0"); }
-  else if(k==="cloud") { cloud(0,-3,"#8f8ca3"); cloud(5,2,"#b5b2c4","b"); }
-  else if(k==="rain"){ cloud(0,-6,"#9b98b0"); drops(3); }
-  else if(k==="storm"){ cloud(0,-6,"#7e7b94"); add("polygon",{class:"bolt",points:"24.2,30 17.2,41 23.2,41 20.2,48 31.2,35 25.2,35 28.2,30",fill:"#ffca85"}); }
-  else if(k==="snow"){ cloud(0,-6,"#b5b2c4"); [[16.2,41],[24.2,44],[32.2,41]].forEach(([x,y],i)=>flake(x,y,i)); }
-  else if(k==="mix"){ cloud(0,-6,"#9b98b0"); drop(17.7,39,14.7,46,0); flake(24.2,43,1); drop(33.7,39,30.7,46,2); }
-  else if(k==="fog"){ cloud(0,-8,"#9b98b0"); [34,39,44].forEach((y,i)=>add("line",{class:"fogl",style:`animation-delay:${-i*1.4}s`,x1:10+i*2,y1:y,x2:38-i*2,y2:y,stroke:"#8f8ca3","stroke-width":2.6,"stroke-linecap":"round"})); }
-  else if(k==="wind"){ [[16,34,1],[25,40,1],[34,30,0]].forEach(([y,l,hook],i)=>add("path",{class:"windl",style:`animation-delay:${-i*0.9}s`,d:hook?`M8 ${y}H${8+l}a4.5 4.5 0 1 0-4.5-4.5`:`M8 ${y}H${8+l}`,fill:"none",stroke:"#b5b2c4","stroke-width":2.6,"stroke-linecap":"round"})); }
+  else if(k==="partday"){ sun(17,17,7,true); cloud(4,-2,ic("#c9c6d8")); }
+  else if(k==="partnight"){ moon(-6,-6,0.7); cloud(4,-2,ic("#9b98b0")); }
+  else if(k==="cloud") { cloud(0,-3,ic("#8f8ca3")); cloud(5,2,ic("#b5b2c4"),"b"); }
+  else if(k==="rain"){ cloud(0,-6,ic("#9b98b0")); drops(3); }
+  else if(k==="storm"){ cloud(0,-6,ic("#7e7b94")); add("polygon",{class:"bolt",points:"24.2,30 17.2,41 23.2,41 20.2,48 31.2,35 25.2,35 28.2,30",fill:ic("#ffca85")}); }
+  else if(k==="snow"){ cloud(0,-6,ic("#b5b2c4")); [[16.2,41],[24.2,44],[32.2,41]].forEach(([x,y],i)=>flake(x,y,i)); }
+  else if(k==="mix"){ cloud(0,-6,ic("#9b98b0")); drop(17.7,39,14.7,46,0); flake(24.2,43,1); drop(33.7,39,30.7,46,2); }
+  else if(k==="fog"){ cloud(0,-8,ic("#9b98b0")); [34,39,44].forEach((y,i)=>add("line",{class:"fogl",style:`animation-delay:${-i*1.4}s`,x1:10+i*2,y1:y,x2:38-i*2,y2:y,stroke:ic("#8f8ca3"),"stroke-width":2.6,"stroke-linecap":"round"})); }
+  else if(k==="wind"){ [[16,34,1],[25,40,1],[34,30,0]].forEach(([y,l,hook],i)=>add("path",{class:"windl",style:`animation-delay:${-i*0.9}s`,d:hook?`M8 ${y}H${8+l}a4.5 4.5 0 1 0-4.5-4.5`:`M8 ${y}H${8+l}`,fill:"none",stroke:(IS_LIGHT?"#64748b":"#b5b2c4"),"stroke-width":2.6,"stroke-linecap":"round"})); }
   return svg;
 }
 
