@@ -1424,7 +1424,11 @@ function initRefresh(){
 let REFRESHING=false;
 function initAutoUpdate(){
   if(location.protocol==="file:") return;
-  const busyUI=()=>{ const open=id=>{ const e=document.getElementById(id); return e&&e.classList.contains("open"); }; const a=document.activeElement; return open("datePop")||open("fpanel")||(a&&/^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName)); };
+  /* Busy means a menu is open, or a text box has focus and a key was pressed in the last minute. A dropdown that was used and
+     closed keeps focus, so focus alone must not count, or the page would never refresh after someone picked a station. */
+  let lastKey=0; document.addEventListener("keydown",()=>{ lastKey=Date.now(); },true);
+  const busyUI=()=>{ const open=id=>{ const e=document.getElementById(id); return e&&e.classList.contains("open"); }; const a=document.activeElement;
+    return open("datePop")||open("fpanel")||(a&&/^(INPUT|TEXTAREA)$/.test(a.tagName)&&Date.now()-lastKey<60000); };
   const tick=async()=>{
     if(REFRESHING) return;
     try{
@@ -1434,6 +1438,9 @@ function initAutoUpdate(){
     }catch(e){}
   };
   setInterval(tick,60000);
+  /* A window that sat behind others (or a PC that slept) has its timers slowed or paused: check the moment it is looked at again. */
+  let lastLook=0; const look=()=>{ if(document.hidden||Date.now()-lastLook<15000) return; lastLook=Date.now(); tick(); };
+  document.addEventListener("visibilitychange",look); window.addEventListener("focus",look);
 }
 init();
 </script>
