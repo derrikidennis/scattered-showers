@@ -134,7 +134,7 @@ th{color:var(--mute);font-weight:600;position:sticky;top:0;background:var(--card
 .alertbox summary{cursor:pointer;padding:10px 14px;font-weight:700;list-style:none;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
 .alertbox summary::-webkit-details-marker{display:none}
 .alertbox .at{font-weight:500;font-size:13px;opacity:.92}
-.alertbox .abody{padding:0 14px 12px;font-size:14px}
+.alertbox .abody{padding:0 14px 12px;font-size:14px;cursor:pointer}
 .alertbox .abody h4{margin:10px 0 2px;font-size:14px}
 .alertbox .abody p{margin:0 0 6px}
 #refreshMsg{font-size:12.5px;color:var(--mute);max-width:420px}
@@ -826,6 +826,8 @@ function alertBox(a,s,open){
   const part=(h,txt)=>{ const ps=paragraphs(txt); if(!ps.length) return; b.appendChild(el("h4",null,h)); ps.forEach(x=>b.appendChild(el("p",null,x))); };
   part("What it says",a.description||a.headline); part("What to do",a.instruction); part("Where",a.area); part("Issued by",a.sender);
   d.appendChild(b);
+  // a tap anywhere in the open alert closes it, except on a link or while text is being selected to copy
+  b.addEventListener("click",e=>{ if(e.target.closest("a")) return; const sel=window.getSelection&&window.getSelection(); if(sel&&String(sel).length) return; d.open=false; });
   d.addEventListener("toggle",()=>{ const set=openSet(); if(d.open) set.add(a.key); else set.delete(a.key); saveOpen(set); });
   return d;
 }
