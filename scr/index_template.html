@@ -109,14 +109,17 @@ th{color:var(--mute);font-weight:600;position:sticky;top:0;background:var(--card
 .actions .stat .upd{white-space:nowrap}
 .actions .stat .upd.warn{white-space:normal}
 .actions .btns{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
-#themeSeg{position:absolute;left:0;top:26px}
+#themeBox{position:absolute;left:0;top:26px;display:flex;flex-direction:column;align-items:flex-start;gap:8px}
+#fxRow{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--mute)}
+#fxBtn{background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:5px 12px;font:inherit;font-size:13px;cursor:pointer;min-width:48px}
+#fxBtn[aria-pressed=true]{background:var(--card2);box-shadow:inset 0 -2px 0 var(--purple)}
 #themeSeg button{padding:5px 12px;font-size:13px}
 #refreshMsg{text-align:right}
 /* the header grows only while a long note is showing, so nothing slides behind the header line */
 .masthead:has(#refreshMsg:not(:empty)){padding-bottom:54px}
 .masthead:has(.upd.warn){padding-bottom:56px}
 .masthead:has(#refreshMsg:not(:empty)):has(.upd.warn){padding-bottom:96px}
-@media(max-width:900px){#themeSeg{position:static;margin-top:10px}.actions{position:static;max-width:none;align-items:center;margin:12px 0 0}.actions .stat{justify-content:center;text-align:center}#refreshMsg{text-align:center}
+@media(max-width:900px){#themeBox{position:static;margin-top:10px;flex-direction:row;flex-wrap:wrap;align-items:center;gap:10px}.actions{position:static;max-width:none;align-items:center;margin:12px 0 0}.actions .stat{justify-content:center;text-align:center}#refreshMsg{text-align:center}
   .masthead:has(#refreshMsg:not(:empty)),.masthead:has(.upd.warn),.masthead:has(#refreshMsg:not(:empty)):has(.upd.warn){padding-bottom:16px}}
 .act{background:var(--card2);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:8px 14px;font:inherit;cursor:pointer}
 @media (hover:hover){.act:hover{border-color:var(--purple)}}
@@ -228,6 +231,11 @@ input[type=date]:focus-visible{outline:2px solid var(--cool);outline-offset:2px}
 @keyframes rd-glow{from{opacity:.78}to{opacity:1}}
 @keyframes rd-slide{from{transform:translateX(-2px)}to{transform:translateX(2px)}}
 .still .ic *{animation:none!important}
+/* rain and wind drawn behind the text of a tile; the canvas sits under the words and fades out toward the bottom */
+.hasfx{position:relative;isolation:isolate}
+.fxc{position:absolute;left:0;top:0;width:100%;height:100%;z-index:-1;pointer-events:none;border-radius:inherit;-webkit-mask-image:linear-gradient(#000 35%,transparent 100%);mask-image:linear-gradient(#000 35%,transparent 100%)}
+.fxc.head{height:170px;max-height:100%;-webkit-mask-image:linear-gradient(#000 40%,transparent 100%);mask-image:linear-gradient(#000 40%,transparent 100%)}
+@media print{.fxc{display:none}}
 @media (prefers-reduced-motion:reduce){.ic *{animation:none!important}}
 .rd-leg{background:var(--ovl);border:1px solid var(--line);border-radius:6px;padding:6px 9px;font-size:12px;color:var(--ink);line-height:1.5}
 .rd-leg .sw{display:inline-block;width:28px;height:9px;border-radius:2px;margin-right:7px;vertical-align:middle}
@@ -242,7 +250,10 @@ input[type=date]:focus-visible{outline:2px solid var(--cool);outline-offset:2px}
 <div class="masthead">
   <h1>Scattered Showers</h1>
   <div class="sub" id="stationsLine"></div>
-  <div class="seg" id="themeSeg" role="group" aria-label="Theme"><button type="button" data-t="auto" aria-pressed="false">Auto</button><button type="button" data-t="light" aria-pressed="false">Light</button><button type="button" data-t="dark" aria-pressed="false">Dark</button></div>
+  <div id="themeBox">
+    <div class="seg" id="themeSeg" role="group" aria-label="Theme"><button type="button" data-t="auto" aria-pressed="false">Auto</button><button type="button" data-t="light" aria-pressed="false">Light</button><button type="button" data-t="dark" aria-pressed="false">Dark</button></div>
+    <span id="fxRow">Effects: <button type="button" id="fxBtn" aria-pressed="true">On</button></span>
+  </div>
   <div class="actions"><div class="btns"><button class="act" id="guideBtn" type="button">How To Guide</button><button class="act" id="refreshBtn" type="button">&#x21BB; Refresh data</button></div><div class="stat"><span id="alertAt" class="upd"></span><span id="updAt" class="upd"></span></div><span id="refreshMsg" role="status"></span></div>
 </div>
 <header>
@@ -645,6 +656,112 @@ function summaryTable(s){
   t.appendChild(tb); const w=el("div","scroll tall"); w.appendChild(t); return w;
 }
 
+/* ---------- weather effects: rain and wind drawn behind the station tiles and the station page header ----------
+   One canvas per tile, each fed by its own station's live reading. Nothing draws while a station is Quiet.
+   The page reloads itself for new data, so a fresh load jumps straight to the right amount; changes while the page
+   stays open (Quiet to Reporting, the Effects button) ease in or out one streak at a time.
+   Snow code is in but switched off (FX_SNOW_ON) until there is real snow to test it against. */
+const FX_KEY="ss.effects";
+let FX_ON=true;
+try{ const v=localStorage.getItem(FX_KEY);
+  if(v==="off") FX_ON=false;
+  else if(v!=="on" && window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches) FX_ON=false;   // device asks for less motion and nothing is saved yet
+}catch(e){}
+const FX_SNOW_ON=false;
+const FX_RGB=IS_LIGHT?{rain:"3,105,161",snow:"96,140,190",wind:"90,110,150"}:{rain:"130,226,255",snow:"255,255,255",wind:"170,180,215"};
+const FX_LIST=[]; let FX_IO=null, FX_RO=null, fxRaf=0, fxLast=0, fxT=0;
+/* the screen is a map with north at the top: a north wind blows down, a south wind blows up, a west wind blows right */
+const fxVec=d=>{ const a=d*Math.PI/180; return {x:Math.round(-Math.sin(a)*1000)/1000+0, y:Math.round(Math.cos(a)*1000)/1000+0}; };
+const fxPulse=T=>{ const a=Math.max(0,Math.sin(T*0.9)); return a*a*(0.5+0.5*Math.sin(T*0.31)); };
+function fxSnowLevel(s){ return 0; }   // 0 none, 1 flurries to 4 heavy. Filled in when snow goes live.
+function fxInputs(f){
+  const s=f.s, L=s.latest, none={rain:false,t:0,snow:0,wind:false,ws:0,wg:0,dir:null};
+  if(statusOf(s).cls!=="ok") return none;
+  const rate=+L.rainRate||0, ws=+L.wind||0, wg=Math.max(ws,+L.gust||0);
+  // wind lines: on at 20 sustained (off under 18), or gusts over 25 (off under 22), so a number hovering at the edge does not flicker
+  if(ws>=20) f.sus=true; else if(ws<18) f.sus=false;
+  if(wg>25) f.gus=true; else if(wg<22) f.gus=false;
+  const snow=FX_SNOW_ON?fxSnowLevel(s):0;
+  const dir=(L.dir==null||isNaN(+L.dir))?null:+L.dir;
+  return {rain:rate>0&&!snow, t:rate>0?Math.max(0,Math.min(1,Math.log(rate/0.005)/Math.log(300))):0, snow, wind:(f.sus||f.gus)&&dir!=null, ws, wg, dir};
+}
+function Fx(card,s,head){
+  const c=document.createElement("canvas"); c.className="fxc"+(head?" head":""); c.setAttribute("aria-hidden","true");
+  card.classList.add("hasfx"); card.insertBefore(c,card.firstChild);
+  Object.assign(this,{c,x:c.getContext("2d"),s,p:[],wi:[],w:0,h:0,acc:1e9,sus:false,gus:false,vis:true,ready:false,soft:false,idle:false,drawn:false,ph:Math.random()*60,in:null,tr:0,tw:0});
+  c._fx=this; if(FX_IO) FX_IO.observe(c); if(FX_RO) FX_RO.observe(c);
+}
+Fx.prototype.size=function(){ const r=this.c.getBoundingClientRect(); if(r.width<2||r.height<2) return false;
+  const d=Math.min(2,window.devicePixelRatio||1); this.w=r.width; this.h=r.height; this.c.width=Math.round(r.width*d); this.c.height=Math.round(r.height*d); this.x.setTransform(d,0,0,d,0,0); return true; };
+Fx.prototype.targets=function(){ const i=this.in, u=(this.w*this.h)/30000, pre=i.rain||i.snow>0;
+  this.tr=i.rain?Math.round((4+i.t*80)*u):(i.snow>0?Math.round([0,5,16,40,85][i.snow]*u):0);
+  const st=Math.max(20,Math.min(i.ws,45));
+  this.tw=i.wind?Math.round((2+(st-20)/25*7)*u*(pre?0.6:1)):0; };
+Fx.prototype.mk=function(top){ const i=this.in, o={};
+  if(i.snow>0){ o.k="s"; o.r=1+Math.random()*1.8+i.snow*0.15; o.vy=0.35+Math.random()*0.5+i.snow*0.12; o.ph=Math.random()*6.28; o.sw=0.2+Math.random()*0.5; o.a=0.5+Math.random()*0.4; }
+  else{ const t=i.t; o.k="r"; o.len=(8+t*16)*(0.7+Math.random()*0.6); o.vy=(5+t*10)*(0.85+Math.random()*0.3); o.a=(0.2+t*0.32)*(0.6+Math.random()*0.4); o.lw=0.9+t*0.8; }
+  o.x=Math.random()*(this.w+80)-40; o.y=top?-20:Math.random()*this.h; return o; };
+Fx.prototype.mkLine=function(edge){ const v=this.in.dir==null?{x:0,y:0}:fxVec(this.in.dir), w=this.w, h=this.h;
+  const o={len:90+Math.random()*110, v:0.7+Math.random()*0.6, a:0.2+Math.random()*0.2, ph:Math.random()*6.28, bend:3+Math.random()*7};
+  o.x=Math.random()*w; o.y=Math.random()*h*0.85+4;
+  if(edge){ if(Math.abs(v.x)>=Math.abs(v.y)&&Math.abs(v.x)>0) o.x=v.x>0?-o.len:w+o.len; else if(Math.abs(v.y)>0) o.y=v.y>0?-o.len:h+o.len; }
+  return o; };
+Fx.prototype.jump=function(){ const want=this.in.snow>0?"s":"r";
+  if(this.p.length&&this.p[0].k!==want) this.p=[];
+  while(this.p.length<this.tr) this.p.push(this.mk(false)); this.p.length=Math.min(this.p.length,this.tr);
+  while(this.wi.length<this.tw) this.wi.push(this.mkLine(false)); this.wi.length=Math.min(this.wi.length,this.tw); };
+function fxStep(arr,n,mk){ const d=n-arr.length; if(!d) return; const step=Math.max(1,Math.ceil(Math.abs(d)/120));
+  if(d>0){ for(let i=0;i<Math.min(step,d);i++) arr.push(mk()); } else arr.length-=Math.min(step,-d); }
+Fx.prototype.ease=function(){ const want=this.in.snow>0?"s":"r";
+  if(this.p.length&&this.p[0].k!==want) this.p.length=Math.max(0,this.p.length-3);
+  else fxStep(this.p,this.tr,()=>this.mk(true));
+  fxStep(this.wi,this.tw,()=>this.mkLine(true)); };
+Fx.prototype.draw=function(dt){ const x=this.x, w=this.w, h=this.h, i=this.in; x.clearRect(0,0,w,h);
+  const surge=i.wg>i.ws?fxPulse(fxT+this.ph):0, eff=i.ws+(i.wg-i.ws)*surge, v=i.dir==null?{x:0,y:0}:fxVec(i.dir), N=10, pi=Math.PI;
+  const slant=v.x*Math.min(1,eff/40)*0.9, W=FX_RGB.wind, R=FX_RGB.rain, S=FX_RGB.snow;
+  for(let n=0;n<this.wi.length;n++){ const q=this.wi[n];
+    q.x+=v.x*q.v*(0.45+eff*0.04+surge*1.0)*dt; q.y+=v.y*q.v*(0.45+eff*0.04+surge*1.0)*dt; q.ph+=0.012*dt;
+    if((v.x>0&&q.x-v.x*q.len>w)||(v.x<0&&q.x-v.x*q.len<0)||(v.y>0&&q.y-v.y*q.len>h)||(v.y<0&&q.y-v.y*q.len<0)){ this.wi[n]=this.mkLine(true); continue; }
+    const L=q.len*(1+0.35*surge), bend=q.bend*Math.sin(q.ph), al=q.a*(1+0.7*surge);
+    for(let k=0;k<N;k++){ const s1=k/N, s2=(k+1)/N, o1=bend*Math.sin(pi*s1), o2=bend*Math.sin(pi*s2);
+      x.strokeStyle="rgba("+W+","+(al*Math.sin(pi*(k+0.5)/N))+")"; x.lineWidth=1.3; x.beginPath();
+      x.moveTo(q.x-v.x*s1*L-v.y*o1, q.y-v.y*s1*L+v.x*o1); x.lineTo(q.x-v.x*s2*L-v.y*o2, q.y-v.y*s2*L+v.x*o2); x.stroke(); } }
+  for(let n=0;n<this.p.length;n++){ const p=this.p[n];
+    if(p.k==="r"){ p.y+=p.vy*dt; p.x+=slant*p.vy*dt; if(p.y>h+p.len){ this.p[n]=this.mk(true); continue; }
+      x.strokeStyle="rgba("+R+","+p.a+")"; x.lineWidth=p.lw; x.beginPath(); x.moveTo(p.x,p.y); x.lineTo(p.x-slant*p.len,p.y-p.len); x.stroke(); }
+    else{ p.ph+=0.02*dt; p.y+=p.vy*dt; p.x+=Math.sin(p.ph)*p.sw*dt+v.x*Math.min(1,eff/40)*1.6*dt; if(p.y>h+4){ this.p[n]=this.mk(true); continue; }
+      x.fillStyle="rgba("+S+","+p.a+")"; x.beginPath(); x.arc(p.x,p.y,p.r,0,6.283); x.fill(); } } };
+Fx.prototype.frame=function(dt,dtms){
+  if(!this.ready){ if(!this.size()) return; this.in=fxInputs(this); this.targets(); if(!this.soft) this.jump(); this.ready=true; this.soft=false; this.acc=0; }
+  this.acc+=dtms;
+  if(this.acc>=250){ this.acc=0; this.in=fxInputs(this); this.targets(); this.ease(); }
+  const active=this.p.length||this.wi.length||this.tr||this.tw;
+  if(!this.vis){ this.idle=true; return; }
+  if(active){ this.draw(dt); this.drawn=true; this.idle=false; }
+  else{ if(this.drawn){ this.x.clearRect(0,0,this.w,this.h); this.drawn=false; } this.idle=true; } };
+function fxLoop(ts){
+  fxRaf=0; if(!FX_ON||!FX_LIST.length||document.hidden){ fxLast=0; return; }
+  const dtms=fxLast?Math.min(50,ts-fxLast):16.7; fxLast=ts; fxT+=dtms/1000;
+  const dt=Math.min(3,dtms/16.7); FX_LIST.forEach(f=>f.frame(dt,dtms));
+  if(FX_LIST.every(f=>f.ready&&f.idle)){ fxLast=0; return; }   // nothing to draw anywhere: stop until the next minute tick or a scroll
+  fxRaf=requestAnimationFrame(fxLoop); }
+function fxKick(){ FX_LIST.forEach(f=>{ f.acc=1e9; }); if(FX_ON&&!fxRaf&&FX_LIST.length&&!document.hidden) fxRaf=requestAnimationFrame(fxLoop); }
+function fxReset(){
+  if(FX_IO) FX_IO.disconnect(); if(FX_RO) FX_RO.disconnect(); FX_LIST.length=0;
+  FX_IO=window.IntersectionObserver?new IntersectionObserver(es=>{ es.forEach(e=>{ const f=e.target._fx; if(f) f.vis=e.isIntersecting; }); fxKick(); }):null;
+  FX_RO=window.ResizeObserver?new ResizeObserver(es=>es.forEach(e=>{ const f=e.target._fx; if(f&&f.ready) f.size(); })):null; }
+function attachFx(card,s,head){ const f=new Fx(card,s,head); FX_LIST.push(f); UPDATERS.push(fxKick); if(FX_ON) fxKick(); return f; }
+/* the Effects button: one switch for the rain and wind and the moving forecast icons */
+function fxSet(){
+  document.documentElement.classList.toggle("still",!FX_ON);
+  const b=document.getElementById("fxBtn"); if(b){ b.textContent=FX_ON?"On":"Off"; b.setAttribute("aria-pressed",FX_ON?"true":"false"); }
+  if(!FX_ON){ if(fxRaf){ cancelAnimationFrame(fxRaf); fxRaf=0; } FX_LIST.forEach(f=>{ f.p=[]; f.wi=[]; f.drawn=false; if(f.w) f.x.clearRect(0,0,f.w,f.h); }); return; }
+  FX_LIST.forEach(f=>{ f.p=[]; f.wi=[]; f.ready=false; f.soft=true; });   // start empty and ease in
+  fxKick(); }
+(function(){ const b=document.getElementById("fxBtn"); fxSet();
+  if(b) b.addEventListener("click",()=>{ FX_ON=!FX_ON; try{ localStorage.setItem(FX_KEY,FX_ON?"on":"off"); }catch(e){} fxSet(); }); })();
+document.addEventListener("visibilitychange",()=>{ fxLast=0; fxKick(); });
+
 /* ---------- sections ---------- */
 const QUIET_MIN=30;
 const UPDATERS=[];
@@ -770,6 +887,7 @@ function stationCard(s){
   c.classList.add("go"); c.tabIndex=0; c.setAttribute("role","link"); c.setAttribute("aria-label","Open "+short(s));
   c.addEventListener("click",go);
   c.addEventListener("keydown",e=>{ if((e.key==="Enter"||e.key===" ")&&e.target===c){ e.preventDefault(); go(); } });
+  attachFx(c,s,false);
   return c;
 }
 function fmtDur(sec){ const m=sec/60; if(m<90) return Math.max(0,Math.round(m))+" min"; const h=m/60; if(h<48) return Math.round(h)+" h"; return (h/24).toFixed(1)+" d"; }
@@ -937,7 +1055,7 @@ function stationHead(s){
     t.addEventListener("click",()=>{ state.metric=k; setHash(); render(); });
     tiles.appendChild(t);
   });
-  c.appendChild(tiles); return c;
+  c.appendChild(tiles); attachFx(c,s,true); return c;
 }
 function metricPanel(s,k){
   let charts;
@@ -1195,7 +1313,7 @@ function radarSection(s){
 
 function render(){
   radarDestroy();
-  UPDATERS.length=0; pruneOpen(); UPDATERS.push(alertNote); alertNote();
+  fxReset(); UPDATERS.length=0; pruneOpen(); UPDATERS.push(alertNote); alertNote();
   const main=document.getElementById("main"); main.replaceChildren(); hideTip();
   let draws=[];
   if(state.station==="all"){
