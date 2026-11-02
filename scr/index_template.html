@@ -859,7 +859,7 @@ function precipText(s){
 }
 function stationCard(s){
   const L=s.latest, c=card("st"); c.style.setProperty("--c",color[s.id]);
-  const go=()=>{ state.station=s.id; state.metric="temp"; document.getElementById("stSel").value=s.id; setHash(); render(); window.scrollTo(0,0); };
+  const go=()=>{ state.station=s.id; state.metric="temp"; document.getElementById("stSel").value=s.id; setHash(true); render(); window.scrollTo(0,0); };
   const row=el("div","row");
   const nm=el("div","name"); const dot=el("span","dot"); dot.setAttribute("role","img"); nm.appendChild(dot); nm.appendChild(document.createTextNode(short(s))); row.appendChild(nm);
   const pill=el("span","pill warn"); row.appendChild(pill); c.appendChild(row);
@@ -1347,7 +1347,8 @@ function render(){
 const ISO=/^\d{4}-\d{2}-\d{2}$/;
 function saveView(){ try{ sessionStorage.setItem("wxView",JSON.stringify({y:window.scrollY||0,days:[...DAYSTATE.entries()],t:Date.now()})); }catch(e){} }
 function restoreView(){ try{ const raw=sessionStorage.getItem("wxView"); sessionStorage.removeItem("wxView"); if(!raw) return null; const v=JSON.parse(raw); if(!v||Date.now()-v.t>120000) return null; (v.days||[]).forEach(([k,o])=>DAYSTATE.set(k,o)); return v; }catch(e){ return null; } }
-function setHash(){ try{ let h="#station="+state.station+"&range="+state.range+"&metric="+state.metric; if(state.range==="custom") h+="&from="+state.from+"&to="+state.to; history.replaceState(null,"",h); }catch(e){} }
+/* push=true adds a history step (used when the station changes, so the Back button returns to the previous view). Everything else just updates the address in place. */
+function setHash(push){ try{ let h="#station="+state.station+"&range="+state.range+"&metric="+state.metric; if(state.range==="custom") h+="&from="+state.from+"&to="+state.to; if(push&&h!==location.hash) history.pushState(null,"",h); else history.replaceState(null,"",h); }catch(e){} }
 function readHash(){
   const p=new URLSearchParams(location.hash.slice(1));
   if(p.get("station")&&(p.get("station")==="all"||byId(p.get("station")))) state.station=p.get("station");
@@ -1384,7 +1385,9 @@ function init(){
   fbtn.addEventListener("click",e=>{ e.stopPropagation(); const o=!fpanel.classList.contains("open"); fpanel.classList.toggle("open",o); fbtn.setAttribute("aria-expanded",o); status(); });
   document.addEventListener("click",e=>{ if(!phone()) closeDates(); });
   document.addEventListener("keydown",e=>{ if(e.key==="Escape"){ closeDates(); closePanel(); } });
-  sel.addEventListener("change",()=>{ state.station=sel.value; state.metric="temp"; setHash(); status(); if(phone()) closePanel(); render(); });
+  sel.addEventListener("change",()=>{ state.station=sel.value; state.metric="temp"; setHash(true); status(); if(phone()) closePanel(); render(); });
+  /* Back and Forward: the address holds the view, so read it again and redraw. No address on it means the overview. */
+  window.addEventListener("popstate",()=>{ state.station="all"; state.metric="temp"; readHash(); sel.value=state.station; if(state.range==="custom"){ dFrom.value=state.from; dTo.value=state.to; } mk(); status(); closeDates(); if(phone()) closePanel(); render(); window.scrollTo(0,0); });
   mk();
   document.getElementById("stationsLine").textContent=ST.map(short).join(" · ");
   document.getElementById("foot").textContent="Data provided by Weather Underground (personal weather stations), history collected every 15 minutes by wu_collect.py and saved in monthly CSV files, plus a live reading every 5 minutes for the Right now cards. Forecast: National Weather Service. Alerts: National Weather Service (api.weather.gov), checked every 5 minutes for each station's chosen address by wx_alerts.py. Pressure is the average of each 5-minute min and max, so it is rounded to 0.1 in. Right now cards use a live reading when it is newer than the saved history. Page built "+stamp(BUILT)+" "+zoneAbbr(BUILT)+" · history saved since "+((d)=>{const p=d.split("-"); return (+p[1])+"/"+(+p[2]);})(DATA.start)+".";
