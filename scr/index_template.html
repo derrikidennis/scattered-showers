@@ -42,7 +42,7 @@ select{background:var(--card);color:var(--ink);border:1px solid var(--line);bord
 button:focus-visible,select:focus-visible,.hit:focus-visible{outline:2px solid var(--cool);outline-offset:2px}
 h2{font-size:15px;margin:30px 0 10px;font-weight:650;color:var(--ink)}
 .grid{display:grid;gap:14px}
-.cards{grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
+.cards{grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
 .charts{grid-template-columns:repeat(auto-fit,minmax(480px,1fr))}
 @media(max-width:560px){.charts{grid-template-columns:1fr}}
 .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px}
@@ -119,7 +119,7 @@ th{color:var(--mute);font-weight:600;position:sticky;top:0;background:var(--card
 .masthead:has(#refreshMsg:not(:empty)){padding-bottom:54px}
 .masthead:has(.upd.warn){padding-bottom:56px}
 .masthead:has(#refreshMsg:not(:empty)):has(.upd.warn){padding-bottom:96px}
-@media(max-width:900px){#themeBox{position:static;margin-top:10px;flex-direction:row;flex-wrap:wrap;align-items:center;gap:10px}.actions{position:static;max-width:none;align-items:center;margin:12px 0 0}.actions .stat{justify-content:center;text-align:center}#refreshMsg{text-align:center}
+@media(max-width:900px){#themeBox{position:static;margin-top:10px;flex-direction:row;flex-wrap:wrap;align-items:center;justify-content:center;gap:10px}.actions{position:static;max-width:none;align-items:center;margin:12px 0 0}.actions .stat{justify-content:center;text-align:center}#refreshMsg{text-align:center}
   .masthead:has(#refreshMsg:not(:empty)),.masthead:has(.upd.warn),.masthead:has(#refreshMsg:not(:empty)):has(.upd.warn){padding-bottom:16px}}
 .act{background:var(--card2);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:8px 14px;font:inherit;cursor:pointer}
 @media (hover:hover){.act:hover{border-color:var(--purple)}}
@@ -141,6 +141,8 @@ th{color:var(--mute);font-weight:600;position:sticky;top:0;background:var(--card
 #refreshMsg.err{color:var(--gold)}
 .tiles{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:10px;margin-top:14px}
 @media(max-width:1100px){.tiles{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}}
+/* iPad held upright: seven tiles go 4 + 3, not 6 + 1 */
+@media(min-width:700px) and (max-width:1100px){.tiles{grid-template-columns:repeat(4,minmax(0,1fr))}}
 .tile .gz{display:block;width:100%;max-width:124px;height:auto;margin:6px auto 12px}
 .tile .gz text{font-size:9px;fill:var(--mute)}
 .fc .ic{display:block;width:52px;height:52px;margin-bottom:6px}
@@ -243,6 +245,8 @@ input[type=date]:focus-visible{outline:2px solid var(--cool);outline-offset:2px}
 .leaflet-tooltip{background:var(--card);color:var(--ink);border:1px solid var(--line)}
 .leaflet-bar a{background:var(--card2);color:var(--ink);border-bottom-color:var(--line)}
 @media (max-width:600px){.rd .rd-map{height:300px}}
+/* upright tablet: radar taller than the 380 px default (full screen has its own rule) */
+@media(min-width:700px) and (orientation:portrait){.rd .rd-map{height:540px}}
 </style>
 </head>
 <body>
