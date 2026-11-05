@@ -33,6 +33,7 @@ DRY = os.environ.get("DRY_RUN", "").lower() == "true"
 FORCE = os.environ.get("FORCE_COLLECT", "").lower() == "true"
 ALLOW_EMPTY = os.environ.get("ALLOW_EMPTY_DATA", "").lower() == "true"
 COLLECT_EVERY_S = 13 * 60
+BUMP_EVERY_S = float(os.environ.get("BUMP_MAIN_HOURS", "12")) * 3600   # new empty commit on main when the newest one is this old (see bump_main)
 IDENT = ["-c", "user.name=github-actions[bot]", "-c", "user.email=41898282+github-actions[bot]@users.noreply.github.com"]
 STATE_FILES = ["live", "alerts", "alert_shapes", "snow", "forecast", "hourly"]      # src/dataSource/<name>.json
 FIXED_FILES = ["assets/snow/snow_history.csv", "assets/alerts/alerts_history.csv", "assets/alerts/zone_cache.json",
@@ -185,6 +186,35 @@ def commit_and_push():
     raise RuntimeError("could not save the data: " + out[-300:])
 
 
+def bump_main():
+    """Add one empty commit to the main branch when its newest commit is 12+ hours old.
+    Why: GitHub Pages stopped showing new pages (while still saying "success") after about 463 deploys that all used the same
+    commit as their version label (2026-11-05). A new commit means a new label for the deploys that follow. Never forces anything:
+    if main moved or the push is refused, it skips and tries again on a later run. A problem here never fails the run."""
+    branch = os.environ.get("GITHUB_REF_NAME") or "main"
+    rc, out = git(["log", "-1", "--format=%ct", "HEAD"], cwd=BASE, check=False)
+    if rc != 0 or not out.strip().isdigit():
+        say("Main branch bump: skipped (could not read the newest commit time).")
+        return
+    age = time.time() - int(out.strip())
+    if age < BUMP_EVERY_S:
+        return
+    if DRY:
+        say(f"Main branch bump: DRY RUN, would add an empty commit (newest commit is {age / 3600:.1f} h old).")
+        return
+    rc, remote = git(["ls-remote", REMOTE, f"refs/heads/{branch}"], check=False)
+    rc2, head = git(["rev-parse", "HEAD"], cwd=BASE, check=False)
+    if rc != 0 or rc2 != 0 or not remote.split() or remote.split()[0] != head.strip():
+        say("Main branch bump: skipped (main has moved or could not be read). Will try again on a later run.")
+        return
+    git([*IDENT, "commit", "--quiet", "--allow-empty", "-m", "Keep the page deploys fresh (automatic empty commit)"], cwd=BASE)
+    rc, out = git(["push", "--quiet", push_address(), f"HEAD:refs/heads/{branch}"], cwd=BASE, check=False)
+    if rc == 0:
+        say(f"Main branch bump: added an empty commit (the newest was {age / 3600:.1f} h old).")
+    else:
+        say("Main branch bump: push refused, will try again on a later run: " + out[-200:])
+
+
 def main():
     started = time.time()
     cfg = json.loads((SCR / "stations.json").read_text(encoding="utf-8"))
@@ -232,6 +262,10 @@ def main():
         if rc != 0:
             raise RuntimeError(f"the {kind} leak check found problems; nothing was saved or published")
     commit_and_push()
+    try:
+        bump_main()
+    except Exception as e:
+        say("Main branch bump: problem, carrying on (" + scrub(str(e))[:200] + ")")
     say(f"Done in {time.time() - started:.0f} s ({n} data files checked).")
 
 
