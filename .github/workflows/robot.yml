@@ -4,6 +4,10 @@
 # No timer in this file. GitHub's own timer never fired for this repo (1 run in about 11 hours), so it was removed on 2026-10-31.
 # A Cloudflare Worker named scattered-showers-pinger (code: scr/pinger_worker.js) presses "Run workflow" every 5 minutes.
 # It can still be started by hand with "Run workflow" (untick Dry run to really publish).
+#
+# 2026-11-05: the live page froze at the 05:31 UTC build while every run, deploy and data save still reported success.
+# Every deploy in that stretch used the same commit (ed61027) as its Pages version, 463 deploys before the freeze.
+# Publishing a new commit gives the next deploys a new version. If it freezes again, count the deploys since the last commit.
 
 name: Scattered Showers robot
 
