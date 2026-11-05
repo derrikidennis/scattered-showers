@@ -14,7 +14,7 @@ Two jobs.
 
 The approved list (copied to the repo's main branch):
   scr/ scripts, page template, stations.json, alert colors, fonts and map library with their licenses, requirements.txt,
-  docx/ (the How To Guide and its pictures), .github/workflows/ (the robot's instructions, from scr/workflow/), .gitignore.
+  docx/ (the How To Guide and its pictures), .github/workflows/ (the robot's instructions, from scr/workflow/), README.md (from md/README.md), .gitignore.
 NOT in the list, on purpose: assets/ (history, goes to the data branch by the robot), src/ (built fresh by the robot), scr/_backup,
 logs, the key files, the .bat and .vbs files that only matter on this PC.
 
@@ -189,6 +189,7 @@ def approved():
         if p.is_file():
             add(p, f"scr/vendor/lucide/{p.name}")
     add(BASE / "requirements.txt", "requirements.txt")
+    add(BASE / "md" / "README.md", "README.md")                       # the repo front page (written in md\\README.md, copied to the repo root)
     add(SRC / "docx" / "Scattered_Showers_Guide.html", "docx/Scattered_Showers_Guide.html")
     for p in sorted((SRC / "docx" / "img").glob("*.png")):
         add(p, f"docx/img/{p.name}")
