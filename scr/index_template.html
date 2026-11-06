@@ -1441,13 +1441,23 @@ function initAutoUpdate(){
     try{
       const r=await fetch("dataSource/meta.json",{cache:"no-store"}); if(!r.ok) return;
       const m=await r.json();
-      if(m&&m.built&&Date.parse(m.built)>Date.parse(DATA.built)&&!busyUI()&&!REFRESHING){ saveView(); location.reload(); }
+      if(m&&m.built&&Date.parse(m.built)>Date.parse(DATA.built)&&!busyUI()&&!REFRESHING){
+        /* Loop guard: if a reload brought back the same old copy (a cached page), do not reload for the same build again for 2 minutes. */
+        let tried=""; try{ tried=sessionStorage.getItem("wxAutoBuilt")||""; }catch(e){}
+        const at=tried.split("|"); if(at[0]===m.built&&Date.now()-Number(at[1]||0)<120000) return;
+        try{ sessionStorage.setItem("wxAutoBuilt",m.built+"|"+Date.now()); }catch(e){}
+        saveView(); location.reload();
+      }
     }catch(e){}
   };
   setInterval(tick,60000);
   /* A window that sat behind others (or a PC that slept) has its timers slowed or paused: check the moment it is looked at again. */
   let lastLook=0; const look=()=>{ if(document.hidden||Date.now()-lastLook<15000) return; lastLook=Date.now(); tick(); };
   document.addEventListener("visibilitychange",look); window.addEventListener("focus",look);
+  /* Opening the app: look right away instead of waiting a minute (a phone can show an older cached copy at first), and again when the
+     browser restores a page it kept frozen in memory. */
+  window.addEventListener("pageshow",e=>{ if(e.persisted) look(); });
+  lastLook=Date.now(); tick();
 }
 init();
 </script>
