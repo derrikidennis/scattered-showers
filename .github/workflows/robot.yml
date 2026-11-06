@@ -8,6 +8,8 @@
 # 2026-11-05: the live page froze at the 05:31 UTC build while every run, deploy and data save still reported success.
 # Every deploy in that stretch used the same commit (ed61027) as its Pages version, 463 deploys before the freeze.
 # Publishing a new commit gives the next deploys a new version. If it freezes again, count the deploys since the last commit.
+# 2026-11-06: it froze again at the 19:26 UTC build, after only about 86 deploys of the bot commit 77ea3e1. So the deploy count is not the whole story.
+# The deploy step's "Reported success" is a status lookup by commit ID, so it can be an old success. Trust the page's own built time instead.
 
 name: Scattered Showers robot
 
