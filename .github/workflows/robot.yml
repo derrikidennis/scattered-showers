@@ -10,6 +10,7 @@
 # Publishing a new commit gives the next deploys a new version. If it freezes again, count the deploys since the last commit.
 # 2026-11-06: it froze again at the 19:26 UTC build, after only about 86 deploys of the bot commit 77ea3e1. So the deploy count is not the whole story.
 # The deploy step's "Reported success" is a status lookup by commit ID, so it can be an old success. Trust the page's own built time instead.
+# 2026-11-06: tried giving each deploy its own made-up version label. GitHub answers 404 Not Found: the version must be a real commit in this repo. Do not try again.
 
 name: Scattered Showers robot
 
@@ -86,36 +87,8 @@ jobs:
     timeout-minutes: 10
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url || steps.fallback.outputs.page_url }}
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      # 2026-11-06: the deploy action labels each deploy with the commit ID, and GitHub uses that label as the deployment's ID.
-      # So hundreds of deploys shared one ID, and "Reported success" was a lookup of that shared ID.
-      # This gives every deploy its own label: a hash of the commit ID, the run ID and the attempt number (still 40 characters, like a commit ID).
-      - name: Make a one-time label for this deploy
-        id: label
-        run: |
-          label=$(printf '%s-%s-%s' "$GITHUB_SHA" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" | sha1sum | cut -d' ' -f1)
-          echo "value=$label" >> "$GITHUB_OUTPUT"
-          echo "commit $GITHUB_SHA, run $GITHUB_RUN_ID, attempt $GITHUB_RUN_ATTEMPT -> label $label"
-          # A step cannot overwrite GITHUB_SHA (tried 2026-11-06, the runner ignored it). So write a tiny file that Node runs first
-          # and that changes GITHUB_SHA from inside the deploy action's own process.
-          cat > "$RUNNER_TEMP/wx_label.js" <<'JS'
-          if (process.env.WX_DEPLOY_LABEL) {
-            process.env.GITHUB_SHA = process.env.WX_DEPLOY_LABEL;
-            console.log('wx_label.js: GITHUB_SHA is now ' + process.env.GITHUB_SHA);
-          }
-          JS
-
       - name: Publish the page
         id: deployment
-        # if GitHub refuses the label, the next step publishes the old way so the page still updates
-        continue-on-error: true
-        env:
-          WX_DEPLOY_LABEL: ${{ steps.label.outputs.value }}
-          NODE_OPTIONS: --require ${{ runner.temp }}/wx_label.js
-        uses: actions/deploy-pages@v5
-
-      - name: Publish the page (old way, only if the one above failed)
-        id: fallback
-        if: ${{ steps.deployment.outcome == 'failure' }}
         uses: actions/deploy-pages@v5
