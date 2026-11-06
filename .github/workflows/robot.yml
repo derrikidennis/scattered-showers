@@ -86,8 +86,27 @@ jobs:
     timeout-minutes: 10
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      url: ${{ steps.deployment.outputs.page_url || steps.fallback.outputs.page_url }}
     steps:
+      # 2026-11-06: the deploy action labels each deploy with the commit ID, and GitHub uses that label as the deployment's ID.
+      # So hundreds of deploys shared one ID, and "Reported success" was a lookup of that shared ID.
+      # This gives every deploy its own label: a hash of the commit ID, the run ID and the attempt number (still 40 characters, like a commit ID).
+      - name: Make a one-time label for this deploy
+        id: label
+        run: |
+          label=$(printf '%s-%s-%s' "$GITHUB_SHA" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" | sha1sum | cut -d' ' -f1)
+          echo "value=$label" >> "$GITHUB_OUTPUT"
+          echo "commit $GITHUB_SHA, run $GITHUB_RUN_ID, attempt $GITHUB_RUN_ATTEMPT -> label $label"
+
       - name: Publish the page
         id: deployment
+        # if GitHub refuses the label, the next step publishes the old way so the page still updates
+        continue-on-error: true
+        env:
+          GITHUB_SHA: ${{ steps.label.outputs.value }}
+        uses: actions/deploy-pages@v5
+
+      - name: Publish the page (old way, only if the one above failed)
+        id: fallback
+        if: ${{ steps.deployment.outcome == 'failure' }}
         uses: actions/deploy-pages@v5
