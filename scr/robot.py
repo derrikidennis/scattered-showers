@@ -15,10 +15,13 @@ Settings come from the environment (GitHub secrets): WU_API_KEY, NWS_CONTACT, CA
   FORCE_COLLECT=true    fetch new readings even if the last fetch was recent
   seed/ folder          if no `data` branch exists yet and the repo has a seed/ folder (publish.py --seed), the branch is created from it
   ALLOW_EMPTY_DATA=true start a brand-new EMPTY `data` branch if none exists and there is no seed (otherwise the run stops, so history is never lost)
+  STALE_PAGE_MINUTES=12 the live page counts as stuck when it is this many minutes behind the newest saved data (see page_is_stale)
+  BUMP_MAIN_HOURS=24    backstop: an empty commit on main when its newest commit is this old, even if the page looks fine
   ROBOT_REMOTE=...      testing only: use this git address instead of GitHub
+  ROBOT_LIVE_URL=...    testing only: read the live page's meta.json from this address instead of the GitHub Pages one
 Exit code 0 = fine, 1 = something stopped the run (the workflow then does not publish).
 """
-import csv, json, os, shutil, subprocess, sys, time
+import csv, json, os, shutil, subprocess, sys, time, urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -33,7 +36,9 @@ DRY = os.environ.get("DRY_RUN", "").lower() == "true"
 FORCE = os.environ.get("FORCE_COLLECT", "").lower() == "true"
 ALLOW_EMPTY = os.environ.get("ALLOW_EMPTY_DATA", "").lower() == "true"
 COLLECT_EVERY_S = 13 * 60
-BUMP_EVERY_S = float(os.environ.get("BUMP_MAIN_HOURS", "12")) * 3600   # new empty commit on main when the newest one is this old (see bump_main)
+BUMP_EVERY_S = float(os.environ.get("BUMP_MAIN_HOURS", "24")) * 3600   # backstop: new empty commit on main when the newest one is this old (see bump_main)
+STALE_AFTER_S = float(os.environ.get("STALE_PAGE_MINUTES", "12")) * 60  # live page this far behind the saved data = stuck (see page_is_stale)
+BUMP_MIN_GAP_S = 45 * 60                                                # after a stuck-page bump, wait this long before bumping again
 IDENT = ["-c", "user.name=github-actions[bot]", "-c", "user.email=41898282+github-actions[bot]@users.noreply.github.com"]
 STATE_FILES = ["live", "alerts", "alert_shapes", "snow", "forecast", "hourly"]      # src/dataSource/<name>.json
 FIXED_FILES = ["assets/snow/snow_history.csv", "assets/alerts/alerts_history.csv", "assets/alerts/zone_cache.json",
@@ -186,31 +191,74 @@ def commit_and_push():
     raise RuntimeError("could not save the data: " + out[-300:])
 
 
-def bump_main():
-    """Add one empty commit to the main branch when its newest commit is 12+ hours old.
-    Why: GitHub Pages stopped showing new pages (while still saying "success") after about 463 deploys that all used the same
-    commit as their version label (2026-11-05). A new commit means a new label for the deploys that follow. Never forces anything:
-    if main moved or the push is refused, it skips and tries again on a later run. A problem here never fails the run."""
+def page_is_stale():
+    """Is the live page stuck? Returns minutes the live page is behind the newest saved data, or None when it cannot be told.
+    The newest commit on the data branch is the previous run (it saved right after building that page). The live page's own
+    dataSource/meta.json says when its page was built. Healthy: they are about the same. Stuck: the data keeps being saved
+    but the live page stays old (the freezes of 2026-11-05 and 2026-11-06, where every step said success)."""
+    rc, out = git(["log", "-1", "--format=%ct", "HEAD"], cwd=DATA, check=False) if DATA.is_dir() else (1, "")
+    if rc != 0 or not out.strip().isdigit():
+        say("Live page check: skipped (no saved data commit to compare with).")
+        return None
+    data_ts = int(out.strip())
+    url = os.environ.get("ROBOT_LIVE_URL")
+    if not url:
+        if "/" not in REPO:
+            say("Live page check: skipped (repository name unknown).")
+            return None
+        owner, name = REPO.split("/", 1)
+        url = f"https://{owner.lower()}.github.io/{name}/dataSource/meta.json"
+    url += ("&" if "?" in url else "?") + f"t={int(time.time())}"        # a new address each time, so no cached copy is returned
+    err = ""
+    for _ in range(2):
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "scattered-showers-robot", "Cache-Control": "no-cache"})
+            with urllib.request.urlopen(req, timeout=15) as r:
+                built = json.loads(r.read().decode("utf-8"))["built"]
+            built_ts = datetime.fromisoformat(built.replace("Z", "+00:00")).timestamp()
+            behind = (data_ts - built_ts) / 60
+            say(f"Live page check: live page built {built}, newest saved data {behind:+.0f} min from it (stuck at {STALE_AFTER_S / 60:.0f}+).")
+            return behind
+        except Exception as e:
+            err = scrub(str(e))[:150]
+            time.sleep(3)
+    say("Live page check: skipped (could not read the live page: " + err + ").")
+    return None
+
+
+def bump_main(behind_min=None):
+    """Add one empty commit to the main branch so the next deploy gets a new commit as its version label.
+    Why: GitHub Pages stopped showing new pages (while still saying "success") on 2026-11-05 (after 463 deploys of one commit) and
+    again on 2026-11-06 (after about 86). In both cases a new commit on main got the page moving again. Two triggers:
+      stuck page: page_is_stale() found the live page STALE_AFTER_S or more behind the data. Bumps if main's newest commit is 45+ min old.
+      backstop:   main's newest commit is BUMP_EVERY_S old (24 h), even if the page looks fine (covers a check that cannot read the site).
+    Never forces anything: if main moved or the push is refused, it skips and tries again on a later run. A problem here never fails the run."""
     branch = os.environ.get("GITHUB_REF_NAME") or "main"
+    stuck = behind_min is not None and behind_min * 60 >= STALE_AFTER_S
     rc, out = git(["log", "-1", "--format=%ct", "HEAD"], cwd=BASE, check=False)
     if rc != 0 or not out.strip().isdigit():
         say("Main branch bump: skipped (could not read the newest commit time).")
         return
     age = time.time() - int(out.strip())
-    if age < BUMP_EVERY_S:
+    need = BUMP_MIN_GAP_S if stuck else BUMP_EVERY_S
+    if age < need:
+        if stuck:
+            say(f"Main branch bump: page looks stuck ({behind_min:.0f} min behind) but main's newest commit is only {age / 60:.0f} min old; waiting for it to take effect.")
         return
+    why = f"live page was {behind_min:.0f} min behind" if stuck else f"newest commit was {age / 3600:.1f} h old"
     if DRY:
-        say(f"Main branch bump: DRY RUN, would add an empty commit (newest commit is {age / 3600:.1f} h old).")
+        say(f"Main branch bump: DRY RUN, would add an empty commit ({why}).")
         return
     rc, remote = git(["ls-remote", REMOTE, f"refs/heads/{branch}"], check=False)
     rc2, head = git(["rev-parse", "HEAD"], cwd=BASE, check=False)
     if rc != 0 or rc2 != 0 or not remote.split() or remote.split()[0] != head.strip():
         say("Main branch bump: skipped (main has moved or could not be read). Will try again on a later run.")
         return
-    git([*IDENT, "commit", "--quiet", "--allow-empty", "-m", "Keep the page deploys fresh (automatic empty commit)"], cwd=BASE)
+    title = ("Unstick the page (automatic empty commit, " + why + ")") if stuck else "Keep the page deploys fresh (automatic empty commit)"
+    git([*IDENT, "commit", "--quiet", "--allow-empty", "-m", title], cwd=BASE)
     rc, out = git(["push", "--quiet", push_address(), f"HEAD:refs/heads/{branch}"], cwd=BASE, check=False)
     if rc == 0:
-        say(f"Main branch bump: added an empty commit (the newest was {age / 3600:.1f} h old).")
+        say(f"Main branch bump: added an empty commit ({why}).")
     else:
         say("Main branch bump: push refused, will try again on a later run: " + out[-200:])
 
@@ -220,6 +268,11 @@ def main():
     cfg = json.loads((SCR / "stations.json").read_text(encoding="utf-8"))
     existed = pull_data()
     say(f"Data branch: {'found' if existed else 'new'}; restored {restore()} files.")
+    try:
+        behind = page_is_stale() if existed else None
+    except Exception as e:
+        behind = None
+        say("Live page check: problem, carrying on (" + scrub(str(e))[:200] + ")")
     if existed and (BASE / "seed").is_dir():
         say("NOTE: the seed folder is no longer needed. Delete it on the PC with: python scr\\publish.py --remove-seed")
 
@@ -263,7 +316,7 @@ def main():
             raise RuntimeError(f"the {kind} leak check found problems; nothing was saved or published")
     commit_and_push()
     try:
-        bump_main()
+        bump_main(behind)
     except Exception as e:
         say("Main branch bump: problem, carrying on (" + scrub(str(e))[:200] + ")")
     say(f"Done in {time.time() - started:.0f} s ({n} data files checked).")
