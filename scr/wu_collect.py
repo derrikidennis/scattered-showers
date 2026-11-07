@@ -28,6 +28,7 @@ Folders (relative to this file):
   ../assets/readings/collector.log  one line per run
   stations.json                   station ids, labels, history start date
 """
+import bisect
 import csv, json, os, re, sys, time, urllib.request, urllib.error, urllib.parse
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
@@ -143,6 +144,54 @@ def save_months(sid, new_rows, existing):
                 w.writerow({c: ("" if merged[e].get(c) is None else _cell(c, merged[e].get(c))) for c in COLS})
         os.replace(tmp, path)
 
+# Near-duplicate guard (added 2026-11-07). WU can hand back two readings 10 s apart (seen at :59:49 and :59:59) that carry the same
+# temperature, humidity, wind, pressure and rain; only wind direction or pressure trend wobbles by a few. The save step only matches the
+# exact epoch, so both got in and an hour showed 13 readings instead of 12. A new reading is skipped when a saved one is within
+# DUP_SECONDS AND matches on DUP_FIELDS. If any of those differ it stays: real extra readings exist, they just never match.
+# Left out on purpose: winddirAvg, pressureTrend, solarRadiationHigh, uvHigh (they change second to second).
+DUP_SECONDS = 30
+DUP_FIELDS = ["humidityHigh", "humidityLow", "humidityAvg"] + [c for c in IMP if c != "pressureTrend"]
+
+def _same_value(a, b):
+    """Saved rows come back from the CSV as text, new rows hold numbers or None, so compare as numbers. Blank matches blank."""
+    for c in DUP_FIELDS:
+        x, y = a.get(c), b.get(c)
+        x = None if x in ("", None) else x
+        y = None if y in ("", None) else y
+        if x is None or y is None:
+            if x is not y:
+                return False
+            continue
+        try:
+            if abs(float(x) - float(y)) > 1e-6:
+                return False
+        except (TypeError, ValueError):
+            if str(x) != str(y):
+                return False
+    return True
+
+def drop_near_duplicates(fresh, existing):
+    """Return (rows to keep, how many were dropped). Oldest first, so the earlier of two twins is the one kept."""
+    epochs = sorted(existing)
+    rows = dict(existing)
+    kept, dropped = [], 0
+    for r in sorted(fresh, key=lambda r: int(r["epoch"])):
+        ep = int(r["epoch"])
+        i = bisect.bisect_left(epochs, ep - DUP_SECONDS)
+        dup = False
+        while i < len(epochs) and epochs[i] <= ep + DUP_SECONDS:
+            if epochs[i] != ep and _same_value(rows[epochs[i]], r):
+                dup = True
+                break
+            i += 1
+        if dup:
+            dropped += 1
+            continue
+        kept.append(r)
+        bisect.insort(epochs, ep)
+        rows[ep] = r
+    return kept, dropped
+
 def run_station(st, start, key, notes):
     sid = st["id"]
     existing = load_station(sid)
@@ -176,6 +225,9 @@ def run_station(st, start, key, notes):
     # keep only rows we don't have and that are on/after the start date
     fresh = [r for e, r in new.items()
              if e not in existing and r["obsTimeLocal"][:10] >= start.isoformat()]
+    fresh, n_dup = drop_near_duplicates(fresh, existing)
+    if n_dup:
+        print(f"{sid}: skipped {n_dup} near-duplicate reading(s) (within {DUP_SECONDS} s of a saved one, same numbers)")
     if fresh and not DRY:
         save_months(sid, fresh, existing)
     if hist_empty:
