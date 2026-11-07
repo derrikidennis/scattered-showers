@@ -1431,33 +1431,61 @@ function initRefresh(){
 let REFRESHING=false;
 function initAutoUpdate(){
   if(location.protocol==="file:") return;
+  /* Open log (added 2026-11-07): a few small lines at the bottom of the page that say what the page did when it opened, so a slow
+     refresh on the phone can be explained instead of guessed at. It lives in sessionStorage, so it survives the page reloading itself. */
+  let LOG=[]; try{ LOG=JSON.parse(sessionStorage.getItem("wxOpenLog")||"[]"); }catch(e){}
+  const drawLog=()=>{ let n=document.getElementById("openLog");
+    if(!n){ const f=document.getElementById("foot"); if(!f||!f.parentNode) return; n=document.createElement("div"); n.id="openLog";
+      n.style.cssText="font-size:11px;line-height:1.5;color:var(--mute);text-align:center;padding:6px 16px 18px;opacity:.75;word-break:break-word";
+      f.parentNode.insertBefore(n,f.nextSibling); }
+    n.textContent="Open log: "+LOG.join(" | "); };
+  const note=what=>{ LOG.push(new Date().toLocaleTimeString([],{hour:"numeric",minute:"2-digit",second:"2-digit"})+" "+what); LOG=LOG.slice(-14);
+    try{ sessionStorage.setItem("wxOpenLog",JSON.stringify(LOG)); }catch(e){} drawLog(); };
+  { let how=""; try{ const nv=performance.getEntriesByType("navigation")[0]; if(nv) how=", "+nv.type+", page from "+(nv.transferSize===0?"cache":"network"); }catch(e){}
+    note("loaded, data built "+hhmm(BUILT)+(location.search?" "+location.search:"")+how); }
+  /* If the copy of the page that opened is more than 15 minutes old, say so right away instead of showing old numbers as current. */
+  const updEl=document.getElementById("updAt"); const updText=updEl.textContent, updClass=updEl.className;
+  const wasOld=(Date.now()/1000-BUILT)>900;
+  if(wasOld){ updEl.className="upd warn"; updEl.textContent="Updated "+hhmm(BUILT)+". Checking for newer data..."; }
+  const checkDone=()=>{ if(wasOld){ updEl.className=updClass; updEl.textContent=updText; } };
   /* Busy means a menu is open, or a text box has focus and a key was pressed in the last minute. A dropdown that was used and
      closed keeps focus, so focus alone must not count, or the page would never refresh after someone picked a station. */
   let lastKey=0; document.addEventListener("keydown",()=>{ lastKey=Date.now(); },true);
   const busyUI=()=>{ const open=id=>{ const e=document.getElementById(id); return e&&e.classList.contains("open"); }; const a=document.activeElement;
     return open("datePop")||open("fpanel")||(a&&/^(INPUT|TEXTAREA)$/.test(a.tagName)&&Date.now()-lastKey<60000); };
-  const tick=async()=>{
+  const tick=async why=>{
     if(REFRESHING) return;
+    const t1=Date.now();
     try{
-      const r=await fetch("dataSource/meta.json",{cache:"no-store"}); if(!r.ok) return;
+      const r=await fetch("dataSource/meta.json",{cache:"no-store"});
+      if(!r.ok){ note("check ("+why+"): server said "+r.status); checkDone(); return; }
       const m=await r.json();
-      if(m&&m.built&&Date.parse(m.built)>Date.parse(DATA.built)&&!busyUI()&&!REFRESHING){
+      const newer=!!(m&&m.built&&Date.parse(m.built)>Date.parse(DATA.built));
+      if(newer||why!=="timer") note("check ("+why+"): "+(Date.now()-t1)+" ms, server build "+(m&&m.built?hhmm(Date.parse(m.built)/1000):"?")+(newer?", newer":", same"));
+      if(newer&&!busyUI()&&!REFRESHING){
         /* Loop guard: if a reload brought back the same old copy (a cached page), do not reload for the same build again for 2 minutes. */
         let tried=""; try{ tried=sessionStorage.getItem("wxAutoBuilt")||""; }catch(e){}
-        const at=tried.split("|"); if(at[0]===m.built&&Date.now()-Number(at[1]||0)<120000) return;
+        const at=tried.split("|"); if(at[0]===m.built&&Date.now()-Number(at[1]||0)<120000){ note("reload held back by the loop guard"); return; }
         try{ sessionStorage.setItem("wxAutoBuilt",m.built+"|"+Date.now()); }catch(e){}
-        saveView(); location.reload();
+        note("reloading");
+        saveView();
+        /* Reload to an address with the build time on it (?v=...). The browser has never seen that address, so it has to fetch a fresh
+           copy of the page instead of handing back the cached one. The #station=... part is kept, so the view stays put. */
+        location.replace(location.pathname+"?v="+encodeURIComponent(m.built)+location.hash);
+        return;
       }
-    }catch(e){}
+      if(newer&&busyUI()) note("newer data waiting, a menu is open");
+      else checkDone();
+    }catch(e){ note("check ("+why+"): failed"); checkDone(); }
   };
-  setInterval(tick,60000);
+  setInterval(()=>tick("timer"),60000);
   /* A window that sat behind others (or a PC that slept) has its timers slowed or paused: check the moment it is looked at again. */
-  let lastLook=0; const look=()=>{ if(document.hidden||Date.now()-lastLook<15000) return; lastLook=Date.now(); tick(); };
-  document.addEventListener("visibilitychange",look); window.addEventListener("focus",look);
+  let lastLook=0; const look=why=>{ if(document.hidden||Date.now()-lastLook<15000) return; lastLook=Date.now(); tick(why); };
+  document.addEventListener("visibilitychange",()=>look("visible")); window.addEventListener("focus",()=>look("focus"));
   /* Opening the app: look right away instead of waiting a minute (a phone can show an older cached copy at first), and again when the
      browser restores a page it kept frozen in memory. */
-  window.addEventListener("pageshow",e=>{ if(e.persisted) look(); });
-  lastLook=Date.now(); tick();
+  window.addEventListener("pageshow",e=>{ if(e.persisted) look("restored"); });
+  lastLook=Date.now(); tick("open");
 }
 init();
 </script>
