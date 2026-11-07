@@ -232,7 +232,7 @@ def run_station(st, start, key, notes):
         save_months(sid, fresh, existing)
     if hist_empty:
         notes.append(f"{sid}: no history for {', '.join(hist_empty)} (outside WU window or station offline)")
-    return len(fresh), hist_days
+    return len(fresh), hist_days, n_dup
 
 def fetch_live(st, key):
     """One call: the station's current reading, trimmed to what the Right now cards use."""
@@ -302,8 +302,8 @@ def main():
     try:
         for st in ([] if LIVE_ONLY else cfg["stations"]):
             try:
-                n, d = run_station(st, start, key, notes)
-                parts.append(f"{st['id']} +{n} rows ({d} history days)")
+                n, d, nd = run_station(st, start, key, notes)
+                parts.append(f"{st['id']} +{n} rows ({d} history days)" + (f", skipped {nd} near-duplicate" if nd else ""))
             except Stop:
                 raise
             except Exception as e:
