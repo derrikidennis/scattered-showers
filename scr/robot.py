@@ -21,7 +21,7 @@ Settings come from the environment (GitHub secrets): WU_API_KEY, NWS_CONTACT, CA
   ROBOT_LIVE_URL=...    testing only: read the live page's meta.json from this address instead of the GitHub Pages one
 Exit code 0 = fine, 1 = something stopped the run (the workflow then does not publish).
 """
-import csv, json, os, shutil, subprocess, sys, time, urllib.request
+import csv, io, json, os, shutil, subprocess, sys, time, urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -42,9 +42,14 @@ BUMP_MIN_GAP_S = 45 * 60                                                # after 
 IDENT = ["-c", "user.name=github-actions[bot]", "-c", "user.email=41898282+github-actions[bot]@users.noreply.github.com"]
 STATE_FILES = ["live", "alerts", "alert_shapes", "snow", "forecast", "hourly"]      # src/dataSource/<name>.json
 FIXED_FILES = ["assets/snow/snow_history.csv", "assets/alerts/alerts_history.csv", "assets/alerts/zone_cache.json",
-               "assets/records/records.json", "assets/records/records_checked.json"]
+               "assets/records/records.json", "assets/records/records_checked.json", "assets/lag/page_lag.csv"]
 summary = []
 SEEDED = False
+LAG = {}                                   # filled by page_is_stale(), written out by record_lag()
+LAG_FILE = BASE / "assets" / "lag" / "page_lag.csv"
+LAG_COLS = ["checked_utc", "data_commit_utc", "cache_busted_built_utc", "plain_built_utc", "cache_busted_behind_min",
+            "plain_behind_min", "plain_cache_age_s", "plain_x_cache", "note"]
+LAG_KEEP = 4320                            # newest rows kept (about 15 days at one run per 5 minutes)
 
 
 def say(msg):
@@ -201,6 +206,8 @@ def page_is_stale():
         say("Live page check: skipped (no saved data commit to compare with).")
         return None
     data_ts = int(out.strip())
+    LAG.clear()
+    LAG["data_ts"] = data_ts
     url = os.environ.get("ROBOT_LIVE_URL")
     if not url:
         if "/" not in REPO:
@@ -208,6 +215,7 @@ def page_is_stale():
             return None
         owner, name = REPO.split("/", 1)
         url = f"https://{owner.lower()}.github.io/{name}/dataSource/meta.json"
+    LAG["plain_url"] = url                                                # the same address without the cache-buster, for record_lag()
     url += ("&" if "?" in url else "?") + f"t={int(time.time())}"        # a new address each time, so no cached copy is returned
     err = ""
     for _ in range(2):
@@ -217,13 +225,61 @@ def page_is_stale():
                 built = json.loads(r.read().decode("utf-8"))["built"]
             built_ts = datetime.fromisoformat(built.replace("Z", "+00:00")).timestamp()
             behind = (data_ts - built_ts) / 60
+            LAG["built_ts"] = built_ts
             say(f"Live page check: live page built {built}, newest saved data {behind:+.0f} min from it (stuck at {STALE_AFTER_S / 60:.0f}+).")
             return behind
         except Exception as e:
             err = scrub(str(e))[:150]
+            LAG["err"] = err
             time.sleep(3)
     say("Live page check: skipped (could not read the live page: " + err + ").")
     return None
+
+
+def record_lag():
+    """One line per run in assets/lag/page_lag.csv (kept on the data branch): how far behind the live page is, asked two ways.
+    cache_busted_* is the check page_is_stale() just made (a new address, so no cached copy). plain_* asks the normal address the way a
+    phone does, with the same request headers, and keeps the cache's Age and X-Cache. If plain lags and cache_busted does not, the cache
+    held an old copy. If both lag, GitHub Pages itself was slow to switch. Added 2026-11-07 to find the cause of the 1:46 PM view at 1:55 PM.
+    Never stops a run: the caller catches problems."""
+    if not LAG:
+        return
+    def iso(ts):
+        return datetime.fromtimestamp(ts, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    data_ts = LAG.get("data_ts")
+    row = {"checked_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"), "data_commit_utc": iso(data_ts) if data_ts else ""}
+    note = []
+    if LAG.get("built_ts") is not None:
+        row["cache_busted_built_utc"] = iso(LAG["built_ts"])
+        row["cache_busted_behind_min"] = "%.1f" % ((data_ts - LAG["built_ts"]) / 60)
+    elif LAG.get("err"):
+        note.append("cache-busted read failed: " + LAG["err"])
+    plain_url = LAG.get("plain_url")
+    if plain_url:
+        try:
+            req = urllib.request.Request(plain_url, headers={"User-Agent": "scattered-showers-robot", "Cache-Control": "no-cache", "Pragma": "no-cache"})
+            with urllib.request.urlopen(req, timeout=15) as r:
+                built = json.loads(r.read().decode("utf-8"))["built"]
+                hdr = r.headers
+            pts = datetime.fromisoformat(built.replace("Z", "+00:00")).timestamp()
+            row["plain_built_utc"] = iso(pts)
+            row["plain_behind_min"] = "%.1f" % ((data_ts - pts) / 60)
+            row["plain_cache_age_s"] = hdr.get("Age") or ""
+            row["plain_x_cache"] = hdr.get("X-Cache") or ""
+        except Exception as e:
+            note.append("plain read failed: " + scrub(str(e))[:100])
+    row["note"] = "; ".join(note)
+    head = ",".join(LAG_COLS)
+    old = LAG_FILE.read_text(encoding="utf-8").splitlines() if LAG_FILE.exists() else []
+    body = [l for l in old if l.strip() and l.strip() != head]
+    buf = io.StringIO()
+    csv.writer(buf, lineterminator="").writerow([row.get(c, "") for c in LAG_COLS])
+    body.append(buf.getvalue())
+    body = body[-LAG_KEEP:]
+    LAG_FILE.parent.mkdir(parents=True, exist_ok=True)
+    tmp = LAG_FILE.with_suffix(".tmp")
+    tmp.write_text(head + "\n" + "\n".join(body) + "\n", encoding="utf-8")
+    os.replace(tmp, LAG_FILE)
 
 
 def bump_main(behind_min=None):
@@ -273,6 +329,11 @@ def main():
     except Exception as e:
         behind = None
         say("Live page check: problem, carrying on (" + scrub(str(e))[:200] + ")")
+    try:
+        if existed:
+            record_lag()
+    except Exception as e:
+        say("Page lag log: problem, carrying on (" + scrub(str(e))[:200] + ")")
     if existed and (BASE / "seed").is_dir():
         say("NOTE: the seed folder is no longer needed. Delete it on the PC with: python scr\\publish.py --remove-seed")
 
