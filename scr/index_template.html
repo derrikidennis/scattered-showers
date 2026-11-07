@@ -308,12 +308,18 @@ function feelsFrom(t,w,hi,wc){ if(t!=null&&t>=80&&hi!=null) return hi; if(t!=nul
   const lv=DATA.live||{};
   ST.forEach(s=>{
     const v=lv[s.id], L=s.latest; if(!v||v.epoch==null||v.epoch<=L.epoch||v.temp==null) return;
+    /* Just after midnight the saved history still ends on yesterday, so the Today high/low/gust still hold yesterday's numbers.
+       When the live reading is from a newer local day than the saved one, start those from the live reading instead of keeping yesterday's. (added 2026-11-07) */
+    const newDay=!!(v.local&&L.local&&String(v.local).slice(0,10)>String(L.local).slice(0,10));
     L.epoch=v.epoch; if(v.local) L.local=v.local;
     L.temp=v.temp; L.feels=feelsFrom(v.temp,v.windSpeed,v.heatIndex,v.windChill);
     L.hum=v.humidity; L.wind=v.windSpeed; L.gust=v.windGust; L.dir=v.winddir; L.press=v.pressure;
     L.rainRate=v.precipRate; L.rainToday=v.precipTotal; if(v.uv!=null) L.uv=v.uv;
-    if(L.todayHi!=null&&v.temp>L.todayHi) L.todayHi=v.temp; if(L.todayLo!=null&&v.temp<L.todayLo) L.todayLo=v.temp;
-    if(L.todayGust!=null&&v.windGust!=null&&v.windGust>L.todayGust) L.todayGust=v.windGust;
+    if(newDay){ L.todayHi=v.temp; L.todayLo=v.temp; L.todayGust=v.windGust==null?null:v.windGust; }
+    else{
+      if(L.todayHi!=null&&v.temp>L.todayHi) L.todayHi=v.temp; if(L.todayLo!=null&&v.temp<L.todayLo) L.todayLo=v.temp;
+      if(L.todayGust!=null&&v.windGust!=null&&v.windGust>L.todayGust) L.todayGust=v.windGust;
+    }
     /* Today's row in the daily summary: the most extreme of history and live wins (high, low, gust); rain takes the bigger total. Averages stay on history. */
     const dd=s.daily.find(x=>x.date===(v.local||"").slice(0,10));
     if(dd){
