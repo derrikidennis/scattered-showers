@@ -1,0 +1,2 @@
+checked_utc,data_commit_utc,cache_busted_built_utc,plain_built_utc,cache_busted_behind_min,plain_behind_min,plain_cache_age_s,plain_x_cache,note
+2026-11-07T20:01:15Z,2026-11-07T19:56:24Z,2026-11-07T19:56:23Z,2026-11-07T19:56:23Z,0.0,0.0,0,HIT,
