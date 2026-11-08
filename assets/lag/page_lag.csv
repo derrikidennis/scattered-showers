@@ -1,4 +1,4 @@
-checked_utc,data_commit_utc,cache_busted_built_utc,plain_built_utc,cache_busted_behind_min,plain_behind_min,plain_cache_age_s,plain_x_cache,note
+checked_utc,data_commit_utc,cache_busted_built_utc,plain_built_utc,cache_busted_behind_min,plain_behind_min,plain_cache_age_s,plain_x_cache,note,cache_busted_fetched_utc,plain_fetched_utc,fetch_gap_s
 2026-11-07T20:01:15Z,2026-11-07T19:56:24Z,2026-11-07T19:56:23Z,2026-11-07T19:56:23Z,0.0,0.0,0,HIT,
 2026-11-07T20:06:14Z,2026-11-07T20:01:29Z,2026-11-07T20:01:28Z,2026-11-07T20:01:28Z,0.0,0.0,87,HIT,
 2026-11-07T20:11:14Z,2026-11-07T20:06:30Z,2026-11-07T20:06:29Z,2026-11-07T20:06:29Z,0.0,0.0,0,HIT,
@@ -276,3 +276,4 @@ checked_utc,data_commit_utc,cache_busted_built_utc,plain_built_utc,cache_busted_
 2026-11-08T18:51:12Z,2026-11-08T18:46:27Z,2026-11-08T18:46:26Z,2026-11-08T18:46:26Z,0.0,0.0,0,MISS,
 2026-11-08T18:56:14Z,2026-11-08T18:51:28Z,2026-11-08T18:51:27Z,2026-11-08T18:51:27Z,0.0,0.0,0,HIT,
 2026-11-08T19:01:12Z,2026-11-08T18:56:24Z,2026-11-08T18:56:23Z,2026-11-08T18:56:23Z,0.0,0.0,0,HIT,
+2026-11-08T19:06:17Z,2026-11-08T19:01:23Z,2026-11-08T19:01:22Z,2026-11-08T19:01:22Z,0.0,0.0,0,HIT,,2026-11-08T19:06:17.805Z,2026-11-08T19:06:17.813Z,0.01
