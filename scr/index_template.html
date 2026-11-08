@@ -30,6 +30,7 @@ body{padding:0 16px 48px}
 @font-face{font-family:"Nunito Title";src:url(data:font/woff2;base64,__NUNITO_B64__) format("woff2");font-weight:800;font-style:normal;font-display:swap}
 .masthead{text-align:center;padding:26px 0 16px;position:relative}
 h1{font-family:"Nunito Title","Segoe UI Rounded",ui-rounded,system-ui,sans-serif;font-size:clamp(24px,6vw,32px);line-height:1.15;margin:0 0 4px;font-weight:800;letter-spacing:.3px;color:var(--storm)}
+h1 a{color:inherit;text-decoration:none;cursor:pointer}
 header{position:sticky;top:0;z-index:5;background:var(--bg);padding:12px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
 .sub{color:var(--mute);font-size:13px}
 .filters{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
@@ -252,7 +253,7 @@ input[type=date]:focus-visible{outline:2px solid var(--cool);outline-offset:2px}
 <body>
 <div class="wrap">
 <div class="masthead">
-  <h1>Scattered Showers</h1>
+  <h1><a href="#station=all&amp;range=today&amp;metric=temp" id="homeLink">Scattered Showers</a></h1>
   <div class="sub" id="stationsLine"></div>
   <div id="themeBox">
     <div class="seg" id="themeSeg" role="group" aria-label="Theme"><button type="button" data-t="auto" aria-pressed="false">Auto</button><button type="button" data-t="light" aria-pressed="false">Light</button><button type="button" data-t="dark" aria-pressed="false">Dark</button></div>
@@ -1396,6 +1397,12 @@ function init(){
   document.addEventListener("click",e=>{ if(!phone()) closeDates(); });
   document.addEventListener("keydown",e=>{ if(e.key==="Escape"){ closeDates(); closePanel(); } });
   sel.addEventListener("change",()=>{ state.station=sel.value; state.metric="temp"; setHash(true); status(); if(phone()) closePanel(); render(); });
+  /* Title tap (added 2026-11-08): back to the starting view (all stations, Today, temperature) and the top of the page.
+     Theme and Effects are not part of the view, so they stay as they are. If the view is already the starting one, no new Back step is added. */
+  document.getElementById("homeLink").addEventListener("click",e=>{ e.preventDefault();
+    const already=state.station==="all"&&state.range==="today"&&state.metric==="temp";
+    state.station="all"; state.range="today"; state.from=state.to=null; state.metric="temp"; sel.value="all"; dFrom.value=dTo.value="";
+    setHash(!already); mk(); status(); closeDates(); if(phone()) closePanel(); render(); window.scrollTo(0,0); });
   /* Back and Forward: the address holds the view, so read it again and redraw. No address on it means the overview. */
   window.addEventListener("popstate",()=>{ state.station="all"; state.metric="temp"; readHash(); sel.value=state.station; if(state.range==="custom"){ dFrom.value=state.from; dTo.value=state.to; } mk(); status(); closeDates(); if(phone()) closePanel(); render(); window.scrollTo(0,0); });
   mk();
