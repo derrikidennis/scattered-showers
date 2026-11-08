@@ -43,7 +43,7 @@ A few choices that look odd until you know why:
 - **A Cloudflare Worker presses the button.** GitHub's own scheduler fired once in about 11 hours for this repo, so it was removed. The Worker (code in `scr/pinger_worker.js`) starts the robot every 5 minutes instead.
 - **The data lives on its own `data` branch.** Every run saves a commit there, so that branch has well over a thousand commits. Keeping it away from `main` keeps the code history readable.
 - **The page is one self-contained HTML file** with the data baked in. A page you leave open checks a tiny file and reloads itself when a newer build exists.
-- **`main` gets an empty commit about every 12 hours.** See "Rough edges" below.
+- **`main` gets automatic empty commits.** The robot adds one when the live page falls behind, and at least once a day regardless. See "Rough edges" below.
 
 ## Privacy by design
 
@@ -90,7 +90,9 @@ I haven't tried this as a fresh fork, so treat it as a map, not a tested recipe.
 
 ## Rough edges
 
-**The page froze, and the robot said everything was fine.** On 2026-11-05 the live page stopped updating for 17 hours while every robot run, data save and Pages deploy reported success. All of those deploys used the same commit as their version label, and the freeze came after the 463rd. A new commit unstuck it. I don't know for sure that the label was the cause, but nothing else lined up. The workaround is that the robot now adds an empty commit to `main` when the newest one is 12 or more hours old (`bump_main` in `scr/robot.py`), which is why the commit list on `main` has a bot in it. If the page freezes again, that's the first place to look.
+**The page froze twice, and the robot said everything was fine.** On 2026-11-05 the live page stopped updating for about 17 hours, and on 2026-11-06 it froze again for about 30 minutes. Both times every robot run, data save and Pages deploy reported success. The first freeze came after the 463rd deploy of the same commit, so I blamed that. The second came after only about 86, so that theory doesn't hold up and I don't know the cause. What I do know: a new commit on `main` got the page moving both times, and the deploy step's "success" is a status lookup by commit ID, so it can be an old success and proves nothing. I also measured GitHub Pages serving an older copy of the page to some visitors for a few minutes (a phone showed 1:46 PM data when 1:51 PM was due).
+
+The workaround: every run, the robot compares the live page's build time with its newest saved data. If the page is 12 or more minutes behind, it adds an empty commit to `main` (as long as `main`'s newest commit is at least 45 minutes old). It also adds one if `main` has gone 24 hours without a commit. That's why the commit list on `main` has a bot in it (`bump_main` in `scr/robot.py`). Every run also logs how far behind the page is to `assets/lag/page_lag.csv` on the `data` branch, so the next freeze leaves evidence. If the page freezes again, look at the newest run's summary on the Actions tab: "Live page check" and "Main branch bump".
 
 **These are personal weather stations.** Readings can be off, offline or in the shade of a tree. Alerts come straight from the National Weather Service, but if the sky looks bad, go to [weather.gov](https://www.weather.gov/) and not to this page.
 
