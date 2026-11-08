@@ -48,7 +48,8 @@ SEEDED = False
 LAG = {}                                   # filled by page_is_stale(), written out by record_lag()
 LAG_FILE = BASE / "assets" / "lag" / "page_lag.csv"
 LAG_COLS = ["checked_utc", "data_commit_utc", "cache_busted_built_utc", "plain_built_utc", "cache_busted_behind_min",
-            "plain_behind_min", "plain_cache_age_s", "plain_x_cache", "note"]
+            "plain_behind_min", "plain_cache_age_s", "plain_x_cache", "note",
+            "cache_busted_fetched_utc", "plain_fetched_utc", "fetch_gap_s"]   # last three added 2026-11-08: when each fetch finished (older rows leave them empty)
 LAG_KEEP = 4320                            # newest rows kept (about 15 days at one run per 5 minutes)
 
 
@@ -223,6 +224,7 @@ def page_is_stale():
             req = urllib.request.Request(url, headers={"User-Agent": "scattered-showers-robot", "Cache-Control": "no-cache"})
             with urllib.request.urlopen(req, timeout=15) as r:
                 built = json.loads(r.read().decode("utf-8"))["built"]
+            LAG["busted_fetched_ts"] = time.time()                           # when this fetch finished, for the fetch_gap_s column
             built_ts = datetime.fromisoformat(built.replace("Z", "+00:00")).timestamp()
             behind = (data_ts - built_ts) / 60
             LAG["built_ts"] = built_ts
@@ -241,11 +243,15 @@ def record_lag():
     cache_busted_* is the check page_is_stale() just made (a new address, so no cached copy). plain_* asks the normal address the way a
     phone does, with the same request headers, and keeps the cache's Age and X-Cache. If plain lags and cache_busted does not, the cache
     held an old copy. If both lag, GitHub Pages itself was slow to switch. Added 2026-11-07 to find the cause of the 1:46 PM view at 1:55 PM.
+    Added 2026-11-08: the time each fetch finished and the gap between the two, so a "the columns disagree" row can be judged
+    (a short gap means a deploy landing in between is a live explanation; a long gap does not).
     Never stops a run: the caller catches problems."""
     if not LAG:
         return
     def iso(ts):
         return datetime.fromtimestamp(ts, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    def iso_ms(ts):
+        return datetime.fromtimestamp(ts, timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
     data_ts = LAG.get("data_ts")
     row = {"checked_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"), "data_commit_utc": iso(data_ts) if data_ts else ""}
     note = []
@@ -261,17 +267,22 @@ def record_lag():
             with urllib.request.urlopen(req, timeout=15) as r:
                 built = json.loads(r.read().decode("utf-8"))["built"]
                 hdr = r.headers
+            plain_done = time.time()
             pts = datetime.fromisoformat(built.replace("Z", "+00:00")).timestamp()
             row["plain_built_utc"] = iso(pts)
             row["plain_behind_min"] = "%.1f" % ((data_ts - pts) / 60)
             row["plain_cache_age_s"] = hdr.get("Age") or ""
             row["plain_x_cache"] = hdr.get("X-Cache") or ""
+            row["plain_fetched_utc"] = iso_ms(plain_done)
+            if LAG.get("busted_fetched_ts") is not None:
+                row["cache_busted_fetched_utc"] = iso_ms(LAG["busted_fetched_ts"])
+                row["fetch_gap_s"] = "%.2f" % (plain_done - LAG["busted_fetched_ts"])
         except Exception as e:
             note.append("plain read failed: " + scrub(str(e))[:100])
     row["note"] = "; ".join(note)
     head = ",".join(LAG_COLS)
     old = LAG_FILE.read_text(encoding="utf-8").splitlines() if LAG_FILE.exists() else []
-    body = [l for l in old if l.strip() and l.strip() != head]
+    body = [l for l in old if l.strip() and not l.startswith("checked_utc,")]     # drop any header line, old or new (the columns changed on 2026-11-08)
     buf = io.StringIO()
     csv.writer(buf, lineterminator="").writerow([row.get(c, "") for c in LAG_COLS])
     body.append(buf.getvalue())
