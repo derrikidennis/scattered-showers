@@ -1470,7 +1470,7 @@ function initAutoUpdate(){
     if(REFRESHING) return;
     const t1=Date.now();
     try{
-      const r=await fetch("dataSource/meta.json",{cache:"no-store"});
+      const r=await fetch("dataSource/meta.json?t="+Date.now(),{cache:"no-store"});
       if(!r.ok){ note("check ("+why+"): server said "+r.status); checkDone(); return; }
       const m=await r.json();
       const newer=!!(m&&m.built&&Date.parse(m.built)>Date.parse(DATA.built));
