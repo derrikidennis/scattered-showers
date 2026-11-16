@@ -1447,11 +1447,7 @@ function initAutoUpdate(){
   /* Open log (added 2026-11-07): a few small lines at the bottom of the page that say what the page did when it opened, so a slow
      refresh on the phone can be explained instead of guessed at. It lives in sessionStorage, so it survives the page reloading itself. */
   let LOG=[]; try{ LOG=JSON.parse(sessionStorage.getItem("wxOpenLog")||"[]"); }catch(e){}
-  const drawLog=()=>{ let n=document.getElementById("openLog");
-    if(!n){ const f=document.getElementById("foot"); if(!f||!f.parentNode) return; n=document.createElement("div"); n.id="openLog";
-      n.style.cssText="font-size:11px;line-height:1.5;color:var(--mute);text-align:center;padding:6px 16px 18px;opacity:.75;word-break:break-word";
-      f.parentNode.insertBefore(n,f.nextSibling); }
-    n.textContent="Open log: "+LOG.join(" | "); };
+  const drawLog=()=>{}; /* line at the bottom of the page removed 2026-11-16, notes still go to sessionStorage */
   const note=what=>{ LOG.push(new Date().toLocaleTimeString([],{hour:"numeric",minute:"2-digit",second:"2-digit"})+" "+what); LOG=LOG.slice(-14);
     try{ sessionStorage.setItem("wxOpenLog",JSON.stringify(LOG)); }catch(e){} drawLog(); };
   { let how=""; try{ const nv=performance.getEntriesByType("navigation")[0]; if(nv) how=", "+nv.type+", page from "+(nv.transferSize===0?"cache":"network"); }catch(e){}
