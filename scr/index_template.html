@@ -236,8 +236,9 @@ input[type=date]:focus-visible{outline:2px solid var(--cool);outline-offset:2px}
 .still .ic *{animation:none!important}
 .skyb{position:relative;height:150px;margin:-16px -16px 12px;border-radius:11px 11px 0 0;overflow:hidden;background:#243461}
 .skyb svg.skysvg{position:absolute;left:0;top:0;width:100%;height:100%;display:block;overflow:hidden}
-.skyn{position:absolute;left:18px;bottom:10px;font-size:15px;line-height:1.25;letter-spacing:.08em;text-transform:uppercase;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.5);max-width:55%}
-.skyw{position:absolute;right:18px;bottom:10px;font-size:15px;line-height:1.25;color:#fff;max-width:42%;text-align:right;text-shadow:0 1px 3px rgba(0,0,0,.5)}
+.skyb::after{content:"";position:absolute;left:0;right:0;bottom:0;height:64px;background:linear-gradient(to bottom,rgba(6,10,18,0),rgba(6,10,18,.55));pointer-events:none}
+.skyn{position:absolute;z-index:2;left:18px;bottom:10px;font-size:15px;line-height:1.25;letter-spacing:.08em;text-transform:uppercase;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.75),0 0 9px rgba(0,0,0,.5);max-width:55%}
+.skyw{position:absolute;z-index:2;right:18px;bottom:10px;font-size:15px;line-height:1.25;color:#fff;max-width:42%;text-align:right;text-shadow:0 1px 3px rgba(0,0,0,.75),0 0 9px rgba(0,0,0,.5)}
 .sktw{animation:sktw 3s ease-in-out infinite alternate}@keyframes sktw{from{opacity:.4}to{opacity:1}}
 .skrot{transform-origin:0 0;animation:skrot 90s linear infinite}@keyframes skrot{to{transform:rotate(360deg)}}
 .skcl{will-change:transform}@keyframes skdrift{to{transform:translateX(var(--d))}}
@@ -1387,6 +1388,19 @@ async function cvTerrain(lat,lon){
     const j=await cvGet("https://api.open-meteo.com/v1/elevation?latitude="+pts.map(p=>p[0].toFixed(4)).join(",")+"&longitude="+pts.map(p=>p[1].toFixed(4)).join(",")), el=j&&j.elevation;
     if(!Array.isArray(el)||el.length!==81||el.some(v=>typeof v!=="number")) return null;
     const t=cvTerrJudge(el); cvTerrSave(lat,lon,t); return t; }catch(e){ return null; } }
+/* Town size for the sky banner when the lookup did not bring one (zip, airport, landmark picks). Asks Open-Meteo for the city's population by name and state, kept per city so it is asked once. Tries the city in the pick's own label first, then the city the National Weather Service names for the spot. No answer: the banner stays plain farmland. */
+const CV_POP_KEY="ss_pop_v1", CV_POP_TRIED=new Set();
+function cvPopCands(pl){ const out=[], add=(c,st)=>{ if(c&&st&&!out.some(o=>o[0].toLowerCase()===c.toLowerCase()&&o[1]===st)) out.push([c,st]); };
+  const lb=String((pl.pick&&pl.pick.label)||"").split(", "); if(lb.length>=2&&/^[A-Z]{2}$/.test(lb[lb.length-1])&&!/\d/.test(lb[lb.length-2])) add(lb[lb.length-2],lb[lb.length-1]);
+  const tt=String(pl.title||"").split(", "); if(tt.length>=2&&/^[A-Z]{2}$/.test(tt[tt.length-1])) add(tt.slice(0,-1).join(", "),tt[tt.length-1]); return out; }
+function cvPopCached(pl){ try{ const o=JSON.parse(localStorage.getItem(CV_POP_KEY)||"{}"); for(const c of cvPopCands(pl)){ const v=o[c[0].toLowerCase()+"|"+c[1]]; if(v>0) return v; } }catch(e){} return null; }
+async function cvPopFor(pl){
+  const c0=cvPopCached(pl); if(c0) return c0;
+  for(const c of cvPopCands(pl)){ const k=c[0].toLowerCase()+"|"+c[1]; if(CV_POP_TRIED.has(k)) continue; CV_POP_TRIED.add(k);
+    try{ const j=await cvGet("https://geocoding-api.open-meteo.com/v1/search?count=50&language=en&format=json&countryCode=US&name="+encodeURIComponent(c[0])); let best=0;
+      (j.results||[]).forEach(x=>{ const ab=STATE_ABBR[(x.admin1||"").toLowerCase()]; if(ab===c[1]&&String(x.name).toLowerCase()===c[0].toLowerCase()&&typeof x.population==="number"&&x.population>best) best=x.population; });
+      if(best>0){ try{ const o=JSON.parse(localStorage.getItem(CV_POP_KEY)||"{}"), ks=Object.keys(o); if(ks.length>=300) delete o[ks[0]]; o[k]=best; localStorage.setItem(CV_POP_KEY,JSON.stringify(o)); }catch(e){} return best; } }catch(e){} }
+  return null; }
 async function cvGet(url){ const c=new AbortController(), t=setTimeout(()=>c.abort(),12000); try{ const r=await fetch(url,{signal:c.signal}); if(!r.ok){ const e=new Error("HTTP "+r.status); e.status=r.status; throw e; } return await r.json(); } finally{ clearTimeout(t); } }
 function cvJsonp(url){ return new Promise((res,rej)=>{ const cb="cvjp"+(++CV_JP)+"_"+Date.now(), sc=document.createElement("script"); const done=()=>{ clearTimeout(to); try{ delete window[cb]; }catch(e){ window[cb]=undefined; } sc.remove(); }; const to=setTimeout(()=>{ done(); rej(new Error("timed out")); },15000); window[cb]=d=>{ done(); res(d); }; sc.onerror=()=>{ done(); rej(new Error("script did not load")); }; sc.src=url+"&callback="+cb; document.head.appendChild(sc); }); }
 function cvAddr(s){ return String(s).split(", ").map((p,i,a)=>/^[A-Za-z]{2}$/.test(p)&&US_STATES[p.toUpperCase()]?p.toUpperCase():p.toLowerCase().replace(/\b([a-z])/g,(m,c)=>c.toUpperCase()).replace(/\b(Nw|Ne|Sw|Se)\b/g,x=>x.toUpperCase())).join(", "); }
@@ -2091,8 +2105,9 @@ function customView(){
     const hi=hist&&hist.hi!==null?Math.max(hist.hi,r.t):null, lo=hist&&hist.lo!==null?Math.min(hist.lo,r.t):null;
     const cs={id:"__cv",tz,label:curPl.title,snowIn:pr?pr.snow:null,cvFx:cvFxFor(r),latest:{temp:r.t,feels:cvFeels(r.t,r.w,r.rh),hum:r.rh,wind:r.w,dir:r.dir,gust:(r.g!==null&&r.g!==undefined&&Math.round(r.g)>Math.round(r.w))?r.g:null,press:r.pr,todayHi:hi,todayLo:lo,rainToday:pr?pr.rain:null}};
     const L=cs.latest, c=card("st"); c.style.setProperty("--c","var(--mute)"); c.classList.add("cvfx");
-    const hz={terrain:cvTerrCached(curPl.lat,curPl.lon)||"flat",pop:curPl.pop>0?curPl.pop:null}, bn=skyBanner(curPl.title,(r.txt||"").slice(0,40),curPl.lat,curPl.lon,Date.now(),r.sky?r.sky.lv:skyLevelWords(r.txt),r.sky&&r.sky.src==="model"?"modeled":"",hz);
+    const hz={terrain:cvTerrCached(curPl.lat,curPl.lon)||"flat",pop:curPl.pop>0?curPl.pop:cvPopCached(curPl)}, bn=skyBanner(curPl.title,(r.txt||"").slice(0,40),curPl.lat,curPl.lon,Date.now(),r.sky?r.sky.lv:skyLevelWords(r.txt),r.sky&&r.sky.src==="model"?"modeled":"",hz);
     c.appendChild(bn);
+    if(!(hz.pop>0)) cvPopFor(curPl).then(p=>{ if(p&&p!==hz.pop){ hz.pop=p; if(bn._w&&bn.isConnected) bn._fill(bn._w); } });
     cvTerrain(curPl.lat,curPl.lon).then(t=>{ if(t&&t!==hz.terrain){ hz.terrain=t; if(bn._w&&bn.isConnected) bn._fill(bn._w); } });
     const row=el("div","row"); const hp=el("span","pill"); row.appendChild(hp); c.appendChild(row);
     const clock=ms=>new Date(ms).toLocaleTimeString([],{hour:"numeric",minute:"2-digit",timeZone:tz,timeZoneName:"short"});
