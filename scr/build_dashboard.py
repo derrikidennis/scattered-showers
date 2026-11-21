@@ -550,9 +550,9 @@ def carto_key():
     except Exception:
         return ""
 
-def read_vendor(name):
+def read_vendor(name, folder="leaflet"):
     try:
-        return (HERE / "vendor" / "leaflet" / name).read_text(encoding="utf-8")
+        return (HERE / "vendor" / folder / name).read_text(encoding="utf-8")
     except Exception:
         return ""
 
@@ -561,6 +561,7 @@ def inject(tpl, data):
     font = HERE / "fonts" / "nunito-latin-800-normal.woff2"
     b64 = base64.b64encode(font.read_bytes()).decode("ascii") if font.exists() else ""
     page = tpl.replace("/*__LEAFLET_CSS__*/", read_vendor("leaflet.css")).replace("/*__LEAFLET_JS__*/", read_vendor("leaflet.js"))
+    page = page.replace("/*__POLYCLIP_JS__*/", read_vendor("polygon-clipping.umd.min.js", "polygon-clipping"))   # joins watch and warning zones into one outline (custom location radar)
     page = page.replace("/*__DATA__*/null", json.dumps(data, separators=(",", ":")))
     page = page.replace("__CARTO_KEY__", carto_key())
     page = page.replace("__NUNITO_B64__", b64)

@@ -6,7 +6,7 @@ radar map can draw them. Saves:
   ../assets/alerts/alert_shapes.log       one line per run
 Run by alerts.bat just before wx_alerts.py (which rebuilds the page). It never rebuilds the page itself.
 
-How it works: for each state that has a station, ask api.weather.gov/alerts/active?area=ST. Warnings usually come with a
+How it works: for each state that has a station, and each state within RADIUS_MI of one, ask api.weather.gov/alerts/active?area=ST. Warnings usually come with a
 storm-shaped outline. Watches (and some warnings) come as a list of zones instead, so each zone's outline is looked up
 once and cached. Only watches and warnings are kept (no advisories or statements). An alert is kept when its outline
 comes within RADIUS_MI of a station. If a state's lookup fails, that state keeps its last good outlines.
@@ -141,6 +141,18 @@ def state_of(st):
     m = re.search(r",\s*([A-Z]{2})\s*$", st.get("alert_place") or "")
     return m.group(1) if m else None
 
+# Rough box (south, north, west, east) of each state, used to find the states within RADIUS_MI of a station so a warning just
+# across a state line is not missed. Same table as CV_BOX in index_template.html (custom location).
+STATE_BOX = {"AL":(30.2,35.0,-88.5,-84.9),"AK":(51.2,71.4,-179.2,-129.9),"AZ":(31.3,37.0,-114.8,-109.0),"AR":(33.0,36.5,-94.6,-89.6),"CA":(32.5,42.0,-124.5,-114.1),"CO":(37.0,41.0,-109.1,-102.0),"CT":(41.0,42.1,-73.7,-71.8),"DE":(38.4,39.8,-75.8,-75.0),"DC":(38.8,39.0,-77.1,-76.9),"FL":(24.5,31.0,-87.6,-80.0),"GA":(30.4,35.0,-85.6,-80.8),"HI":(18.9,22.3,-160.3,-154.8),"ID":(42.0,49.0,-117.2,-111.0),"IL":(37.0,42.5,-91.5,-87.5),"IN":(37.8,41.8,-88.1,-84.8),"IA":(40.4,43.5,-96.6,-90.1),"KS":(37.0,40.0,-102.1,-94.6),"KY":(36.5,39.1,-89.6,-81.9),"LA":(28.9,33.0,-94.0,-88.8),"ME":(43.0,47.5,-71.1,-66.9),"MD":(37.9,39.7,-79.5,-75.0),"MA":(41.2,42.9,-73.5,-69.9),"MI":(41.7,48.3,-90.4,-82.1),"MN":(43.5,49.4,-97.2,-89.5),"MS":(30.2,35.0,-91.7,-88.1),"MO":(36.0,40.6,-95.8,-89.1),"MT":(44.4,49.0,-116.1,-104.0),"NE":(40.0,43.0,-104.1,-95.3),"NV":(35.0,42.0,-120.0,-114.0),"NH":(42.7,45.3,-72.6,-70.6),"NJ":(38.9,41.4,-75.6,-73.9),"NM":(31.3,37.0,-109.1,-103.0),"NY":(40.5,45.0,-79.8,-71.9),"NC":(33.8,36.6,-84.3,-75.5),"ND":(45.9,49.0,-104.1,-96.6),"OH":(38.4,42.0,-84.8,-80.5),"OK":(33.6,37.0,-103.0,-94.4),"OR":(42.0,46.3,-124.6,-116.5),"PA":(39.7,42.3,-80.5,-74.7),"RI":(41.1,42.0,-71.9,-71.1),"SC":(32.0,35.2,-83.4,-78.5),"SD":(42.5,45.9,-104.1,-96.4),"TN":(35.0,36.7,-90.3,-81.6),"TX":(25.8,36.5,-106.7,-93.5),"UT":(37.0,42.0,-114.1,-109.0),"VT":(42.7,45.0,-73.4,-71.5),"VA":(36.5,39.5,-83.7,-75.2),"WA":(45.5,49.0,-124.8,-116.9),"WV":(37.2,40.6,-82.7,-77.7),"WI":(42.5,47.1,-92.9,-86.8),"WY":(41.0,45.0,-111.1,-104.1)}
+
+def states_near(lat, lon, miles=RADIUS_MI):
+    out = set()
+    for k, (s, n, w, e) in STATE_BOX.items():
+        la = min(max(lat, s), n); lo = min(max(lon, w), e)
+        dy = (la - lat) * 69.0; dx = (lo - lon) * 69.0 * math.cos(math.radians((la + lat) / 2))
+        if dx * dx + dy * dy <= miles * miles: out.add(k)
+    return out
+
 def write_json(path, obj):
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(".tmp")
@@ -187,7 +199,8 @@ def main(argv):
         try: zones = json.loads(zfile.read_text(encoding="utf-8")) if zfile.exists() else {}
         except Exception: zones = {}
         stations_cfg = [(st["id"], st.get("alert_lat"), st.get("alert_lon"), state_of(st)) for st in cfg["stations"]]
-        states = sorted({s for _, la, lo, s in stations_cfg if s and la is not None})
+        states = sorted({s for _, la, lo, s in stations_cfg if s and la is not None}
+                        | {k for _, la, lo, s in stations_cfg if la is not None and lo is not None for k in states_near(la, lo)})
         shapes, per_station, notes, budget, new_zones, partial = {}, {}, [], ZONE_BUDGET, 0, 0
         failed = set()
         for stt in states:
@@ -222,7 +235,7 @@ def main(argv):
                 if incomplete: partial += 1
                 shapes[aid] = {"id": aid, "event": w["event"], "kind": w["kind"], "pri": w["pri"], "hex": w["hex"], "end": w["end"],
                                "headline": p.get("headline"), "area": (p.get("areaDesc") or "")[:200], "sender": p.get("senderName"),
-                               "partial": incomplete, "polys": polys}
+                               "partial": incomplete, "polys": polys, "st": stt}
         for sid, la, lo, stt in stations_cfg:
             if la is None or lo is None: continue
             if stt in failed:
@@ -231,6 +244,12 @@ def main(argv):
             for aid, s in shapes.items():
                 if near(s["polys"], la, lo): ids.append(aid)
             ids.sort(key=lambda a: (shapes[a]["pri"], a)); per_station[sid] = ids
+        if failed:                                           # a state that failed keeps its last outlines for every station near them
+            for aid, s in (old.get("shapes") or {}).items():
+                if aid in shapes or s.get("st") not in failed or not (s.get("end") is None or s["end"] > now): continue
+                for sid, la, lo, stt in stations_cfg:
+                    if la is None or lo is None or stt in failed or not near(s["polys"], la, lo): continue
+                    per_station.setdefault(sid, []).append(aid); shapes[aid] = s
         for sid in per_station:                              # reuse last outlines for a failed state
             for aid in per_station[sid]:
                 if aid not in shapes:

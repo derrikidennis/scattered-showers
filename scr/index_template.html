@@ -234,6 +234,15 @@ input[type=date]:focus-visible{outline:2px solid var(--cool);outline-offset:2px}
 @keyframes rd-glow{from{opacity:.78}to{opacity:1}}
 @keyframes rd-slide{from{transform:translateX(-2px)}to{transform:translateX(2px)}}
 .still .ic *{animation:none!important}
+.skyb{position:relative;height:150px;margin:-16px -16px 12px;border-radius:11px 11px 0 0;overflow:hidden;background:#243461}
+.skyb svg.skysvg{position:absolute;left:0;top:0;width:100%;height:100%;display:block;overflow:hidden}
+.skyn{position:absolute;left:18px;bottom:10px;font-size:15px;line-height:1.25;letter-spacing:.08em;text-transform:uppercase;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.5);max-width:55%}
+.skyw{position:absolute;right:18px;bottom:10px;font-size:15px;line-height:1.25;color:#fff;max-width:42%;text-align:right;text-shadow:0 1px 3px rgba(0,0,0,.5)}
+.sktw{animation:sktw 3s ease-in-out infinite alternate}@keyframes sktw{from{opacity:.4}to{opacity:1}}
+.skrot{transform-origin:0 0;animation:skrot 90s linear infinite}@keyframes skrot{to{transform:rotate(360deg)}}
+.skcl{will-change:transform}@keyframes skdrift{to{transform:translateX(var(--d))}}
+.still .skyb *:not(.skcl){animation:none!important}.still .skyb .skcl{animation-play-state:paused!important}
+.cvfx .fxc{z-index:1}
 /* rain and wind drawn behind the text of a tile; the canvas sits under the words and fades out toward the bottom */
 .hasfx{position:relative;isolation:isolate}
 .fxc{position:absolute;left:0;top:0;width:100%;height:100%;z-index:-1;pointer-events:none;border-radius:inherit;-webkit-mask-image:linear-gradient(#000 35%,transparent 100%);mask-image:linear-gradient(#000 35%,transparent 100%)}
@@ -248,6 +257,25 @@ input[type=date]:focus-visible{outline:2px solid var(--cool);outline-offset:2px}
 @media (max-width:600px){.rd .rd-map{height:300px}}
 /* upright tablet: radar taller than the 380 px default (full screen has its own rule) */
 @media(min-width:700px) and (orientation:portrait){.rd .rd-map{height:540px}}
+body.cv #rangeSeg,body.cv .datewrap{display:none}
+.cvform{display:flex;gap:8px;flex-wrap:wrap}
+.cvout{margin-top:10px}
+.cvpicks{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+.cvpick{display:flex;flex-direction:column;align-items:flex-start;text-align:left;background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:10px 12px;font:inherit;cursor:pointer}
+.cvpick small{color:var(--mute);font-size:12.5px}
+.cvpick:hover{background:var(--card2)}
+.cvmsg.err{color:var(--hot)}
+.cvtitle{font-size:22px;font-weight:700}
+.cvtime{color:var(--mute);margin-top:2px}
+.cvtemp{font-size:44px;font-weight:700;line-height:1.1}
+.cvgap{margin-top:10px}
+.cvlate{color:var(--hot)}
+.tile.cvt{cursor:default}
+.cvalbox{margin-top:12px}
+.cvalbox .alerts{margin-bottom:6px}
+.cvalbox .note{margin:6px 0 14px}
+@media (hover:hover){.tile.cvt:hover{border-color:var(--line)}}
+.cvform input{flex:1 1 280px;min-width:0;background:var(--bg);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font:inherit;font-size:16px}
 </style>
 </head>
 <body>
@@ -283,11 +311,17 @@ input[type=date]:focus-visible{outline:2px solid var(--cool);outline-offset:2px}
 </div>
 <div class="tip" id="tip" role="status"></div>
 <script>/*__LEAFLET_JS__*/</script>
+<script>/*__POLYCLIP_JS__*/</script>
 <script>
 const DATA = /*__DATA__*/null;
 const NS = "http://www.w3.org/2000/svg";
 const RANGES = [["today","Today"],["24h","Last 24 hours"],["7d","Last 7 days"],["30d","Last 30 days"],["all","Everything saved"]];
 const state = {station:"all", range:"today", from:null, to:null, metric:"temp"};
+/* Custom location (added 2026-11-19, step 2). Hidden switch: this only exists when the address carries ?custom=1. It is not a password, it is just not advertised. */
+const CUSTOM_ON=/[?&]custom=1(&|$)/.test(location.search);
+let CV_CUR=null, CV_RESTORE=null;   /* the custom place on screen; CV_RESTORE carries it across a theme or refresh reload (sessionStorage, two minutes, removed when read) */
+const CUSTOM_VIEWS={current:"Current location",custom:"Custom location"};
+const isCV=()=>CUSTOM_ON&&!!CUSTOM_VIEWS[state.station];
 const tipEl = document.getElementById("tip");
 /* ---------- theme: Auto follows the device, Light and Dark are saved choices (per device) ---------- */
 const THEME_KEY="ss.theme", THEME_BG={dark:"#15141b",light:"#F8FAFC"};
@@ -649,8 +683,8 @@ function dayPrecipText(d, unit){
   const sn=(d.snow!=null&&d.snow>=SNOW_SHOW)?d.snow:0, w=(d.rain||0)+sn/SNOW_PER_WATER;
   return fmt2(w)+(unit?" in":"")+(sn>0?" (snow "+snowStr(sn)+" in)":"");
 }
-function summaryTable(s){
-  const days=[...dailyFor(s)].reverse();
+function summaryTable(s,daysIn){
+  const days=daysIn?[...daysIn].reverse():[...dailyFor(s)].reverse();
   if(!days.length) return el("div","note","No readings for this range yet.");
   const cols=["Date","High °F","Low °F","Feels high","Feels low","Precip in","Wind high mph","Top gust mph","Pressure in"];
   const t=el("table"); const hr=el("tr"); cols.forEach(h=>hr.appendChild(el("th",null,h))); const th=el("thead"); th.appendChild(hr); t.appendChild(th);
@@ -659,7 +693,7 @@ function summaryTable(s){
     const tr=el("tr","dayrow"); const open=DAYSTATE.has(d.date)?DAYSTATE.get(d.date):days.length===1;
     const first=el("td"); const btn=el("button","rowbtn"); btn.type="button"; btn.setAttribute("aria-expanded",open);
     const ar=el("i",null,open?"▾":"▸"); btn.appendChild(ar); btn.appendChild(document.createTextNode(mdy(d.date)+(d.partial?" (so far)":""))); first.appendChild(btn); tr.appendChild(first);
-    [fmt0(d.hi),fmt0(d.lo),fmt0(d.flHi),fmt0(d.flLo),dayPrecipText(d),fmt0(d.wsHi),fmt0(d.gHi),(d.pLo==null?"–":fmt2(d.pLo)+" to "+fmt2(d.pHi))].forEach(v=>tr.appendChild(el("td",null,v)));
+    [fmt0(d.hi),fmt0(d.lo),fmt0(d.flHi),fmt0(d.flLo),(daysIn&&d.rain==null?"–":dayPrecipText(d)),fmt0(d.wsHi),fmt0(d.gHi),(d.pLo==null?"–":fmt2(d.pLo)+" to "+fmt2(d.pHi))].forEach(v=>tr.appendChild(el("td",null,v)));
     const dr=el("tr","det"); dr.hidden=!open; const dc=el("td"); dc.colSpan=cols.length; dc.appendChild(dayDetail(d,s)); dr.appendChild(dc);
     tr.addEventListener("click",()=>{ dr.hidden=!dr.hidden; DAYSTATE.set(d.date,!dr.hidden); btn.setAttribute("aria-expanded",!dr.hidden); ar.textContent=dr.hidden?"▸":"▾"; });
     tb.appendChild(tr); tb.appendChild(dr);
@@ -686,15 +720,15 @@ const fxVec=d=>{ const a=d*Math.PI/180; return {x:Math.round(-Math.sin(a)*1000)/
 const fxPulse=T=>{ const a=Math.max(0,Math.sin(T*0.9)); return a*a*(0.5+0.5*Math.sin(T*0.31)); };
 function fxSnowLevel(s){ return 0; }   // 0 none, 1 flurries to 4 heavy. Filled in when snow goes live.
 function fxInputs(f){
-  const s=f.s, L=s.latest, none={rain:false,t:0,snow:0,wind:false,ws:0,wg:0,dir:null};
-  if(statusOf(s).cls!=="ok") return none;
-  const rate=+L.rainRate||0, ws=+L.wind||0, wg=Math.max(ws,+L.gust||0);
+  const s=f.s, L=s.latest, none={rain:false,t:0,snow:0,wind:false,ws:0,wg:0,dir:null}, X=s.cvFx||null;   /* X: a custom place card, which has no rain gauge, so rain comes from the weather words (cvFxFor) */
+  if(!X&&statusOf(s).cls!=="ok") return none;
+  const rate=X?(X.rain?1:0):(+L.rainRate||0), ws=X?(+X.ws||0):(+L.wind||0), wg=Math.max(ws,X?(+X.wg||0):(+L.gust||0));
   // wind lines: on at 20 sustained (off under 18), or gusts over 25 (off under 22), so a number hovering at the edge does not flicker
   if(ws>=20) f.sus=true; else if(ws<18) f.sus=false;
   if(wg>25) f.gus=true; else if(wg<22) f.gus=false;
   const snow=FX_SNOW_ON?fxSnowLevel(s):0;
   const dir=(L.dir==null||isNaN(+L.dir))?null:+L.dir;
-  return {rain:rate>0&&!snow, t:rate>0?Math.max(0,Math.min(1,Math.log(rate/0.005)/Math.log(300))):0, snow, wind:(f.sus||f.gus)&&dir!=null, ws, wg, dir};
+  return {rain:rate>0&&!snow, t:X?(X.rain?X.t:0):(rate>0?Math.max(0,Math.min(1,Math.log(rate/0.005)/Math.log(300))):0), snow, wind:(f.sus||f.gus)&&dir!=null, ws, wg, dir};
 }
 function Fx(card,s,head){
   const c=document.createElement("canvas"); c.className="fxc"+(head?" head":""); c.setAttribute("aria-hidden","true");
@@ -787,6 +821,7 @@ const SNOW_MAX_AGE=6*3600;           // older than this and the snow numbers are
 const SNOW_PER_WATER=10;             // 10 in of snow is about 1 in of water
 const SNOW_SHOW=0.05;                // below this (in of snow) nothing extra is shown
 function snowToday(s){
+  if(s.snowIn!==undefined) return s.snowIn;
   const x=SNOW[s.id], ck=DATA.snow&&DATA.snow.checked; if(!x||!ck||nowSec()-ck>SNOW_MAX_AGE) return null;
   try{
     const day=e=>new Intl.DateTimeFormat("en-CA",{timeZone:x.tz,year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date(e*1000));
@@ -830,7 +865,7 @@ function alertWhen(a,tz){
   return started?"until "+when(a.end,true):"from "+when(a.start,false)+" until "+when(a.end,true);
 }
 function paragraphs(text){ return String(text||"").trim().split(/\n\s*\n/).map(x=>x.replace(/\s*\n\s*/g," ").trim()).filter(Boolean); }
-function alertBox(a,s,open){
+function alertBox(a,s,open,noStore){
   const d=el("details","alertbox"); d.style.background=a.fill; d.style.color=a.fg; if(open) d.open=true;
   const sm=el("summary"); sm.appendChild(el("span","an",a.event)); sm.appendChild(el("span","at",alertWhen(a,s.tz))); d.appendChild(sm);
   const b=el("div","abody");
@@ -839,7 +874,7 @@ function alertBox(a,s,open){
   d.appendChild(b);
   // a tap anywhere in the open alert closes it, except on a link or while text is being selected to copy
   b.addEventListener("click",e=>{ if(e.target.closest("a")) return; const sel=window.getSelection&&window.getSelection(); if(sel&&String(sel).length) return; d.open=false; });
-  d.addEventListener("toggle",()=>{ const set=openSet(); if(d.open) set.add(a.key); else set.delete(a.key); saveOpen(set); });
+  if(!noStore) d.addEventListener("toggle",()=>{ const set=openSet(); if(d.open) set.add(a.key); else set.delete(a.key); saveOpen(set); });
   return d;
 }
 function alertsBlock(s){
@@ -1137,8 +1172,8 @@ function radarCompose(ctx,w,h,z,M,Hd){
       else d[i*4+3]=0; } }
   ctx.putImageData(id,0,0); return out;
 }
-function hourlySection(s){
-  const hs=((DATA.hourly||{})[s.id]||{}).hours||[];
+function hourlySection(s,hsIn){
+  const hs=hsIn||((DATA.hourly||{})[s.id]||{}).hours||[];
   const now=Date.now(), list=hs.filter(h=>new Date(h.t).getTime()+3600000>now).slice(0,48);
   if(!list.length) return null;
   const strip=el("div","hr"); strip.setAttribute("aria-label","Hourly forecast, scroll sideways");
@@ -1164,7 +1199,7 @@ function hourlySection(s){
   strip.addEventListener("pointerup",up); strip.addEventListener("pointercancel",up);
   return section("Hourly",strip,"Next 48 hours from the National Weather Service. Drag or swipe sideways for more. The daily forecast below is from the National Weather Service too.");
 }
-function radarSection(s){
+function radarSection(s,ext){
   if(typeof L==="undefined") return section("Radar",el("div","note","The map library did not load, so there is no radar on this page."));
   const STEP=300000, FRAMES=12, FRAME_MS=550, HOLD_LAST=1600;
   const SPEED_KEY="ss.radarSpeed", SNAP=6;                                   /* speed slider 0..100, 50 = Normal; remembered on this device */
@@ -1295,28 +1330,31 @@ function radarSection(s){
 
     /* watch and warning outlines from wx_alert_shapes.py, drawn above the radar; warnings solid, watches dashed, thicker if the station's address is inside */
     inst.alertLayer=L.layerGroup();
-    const SH=DATA.alertShapes||{};
+    const SH0=DATA.alertShapes||{};
     function drawAlerts(){
-      inst.alertLayer.clearLayers();
-      const ids=(SH.stations&&SH.stations[s.id])||[], now=Date.now()/1000; let n=0, nw=0;
+      inst.alertLayer.clearLayers(); const SH=ext?ext():SH0;
+      const ids=ext?Object.keys(SH.shapes||{}):((SH.stations&&SH.stations[s.id])||[]), now=Date.now()/1000; let n=0, nw=0, np=0;
       ids.map(id=>SH.shapes&&SH.shapes[id]).filter(a=>a&&(!a.end||a.end>now)).sort((a,b)=>b.pri-a.pri).forEach(a=>{
-        const hit=!!(a.hit&&a.hit[s.id]), watch=a.kind==="watch"; n++; if(watch) nw++;
+        const hit=!!(a.hit&&a.hit[s.id]), watch=a.kind==="watch"; n++; if(watch) nw++; if(a.partial) np++;
+        const thin=!!a.zones, wgt=thin?1.2:(hit?3.5:(watch?1.5:2.2));      /* custom view: zone lists are drawn as separate thin shapes, not merged */
         /* light map: a thin dark edge under the outline so pale alert colors (yellow, cream, cyan) still show. The alert color itself is unchanged. */
-        if(IS_LIGHT) inst.alertLayer.addLayer(L.polygon(a.polys,{pane:"alerts",interactive:false,color:"#0F172A",opacity:.55,weight:(hit?3.5:(watch?1.5:2.2))+2.4,fill:false,dashArray:watch?"6 6":null}));
-        const poly=L.polygon(a.polys,{pane:"alerts",bubblingMouseEvents:false,color:a.hex,weight:hit?3.5:(watch?1.5:2.2),fillColor:a.hex,fillOpacity:watch?0.05:0.14,dashArray:watch?"6 6":null});
+        if(IS_LIGHT) inst.alertLayer.addLayer(L.polygon(a.polys,{pane:"alerts",interactive:false,color:"#0F172A",opacity:.55,weight:wgt+2.4,fill:false,dashArray:watch?"6 6":null}));
+        const poly=L.polygon(a.polys,{pane:"alerts",bubblingMouseEvents:false,color:a.hex,weight:wgt,fillColor:a.hex,fillOpacity:thin?(watch?0.07:0.10):(watch?0.05:0.14),dashArray:watch?"6 6":null});
         poly.on("click",e=>{ if(!inst.fs){ setFS(true); return; }
-          const box=el("div"); box.appendChild(el("b",null,a.event)); if(hit) box.appendChild(el("div",null,"Your address is inside this one."));
+          const box=el("div"); box.appendChild(el("b",null,a.event)); if(hit) box.appendChild(el("div",null,ext?"This spot is inside this one.":"Your address is inside this one."));
           if(a.headline) box.appendChild(el("div",null,a.headline)); if(a.end) box.appendChild(el("div",null,"Until "+fmtTime(a.end*1000)));
           if(a.area) box.appendChild(el("div",null,a.area)); if(a.partial) box.appendChild(el("div",null,"Some of this outline has not loaded yet."));
           L.popup().setLatLng(e.latlng).setContent(box).openOn(inst.map); });
         inst.alertLayer.addLayer(poly); });
-      let txt=!SH.checked?"Outline data is not available yet.":(n?(n+" nearby: "+(n-nw)+" warning"+(n-nw===1?"":"s")+", "+nw+" watch"+(nw===1?"":"es")):"No watches or warnings nearby.");
+      let txt=!SH.checked?(SH.err?"Couldn't load the watch and warning outlines. Don't assume there are none.":(ext?"Looking for watches and warnings...":"Outline data is not available yet.")):(n?(n+" nearby: "+(n-nw)+" warning"+(n-nw===1?"":"s")+", "+nw+" watch"+(nw===1?"":"es")):"No watches or warnings nearby.");
       const age=SH.checked?Math.round((now-SH.checked)/60):0; if(age>30) txt+=" (outline data is "+age+" min old)";
+      if(ext&&np) txt+=". Some outlines are still loading.";
+      if(ext&&SH.err&&SH.checked) txt+=" (couldn't update, showing the check from "+fmtTime(SH.checked*1000)+")";
       alInfo.textContent=txt; }
     drawAlerts(); if(RADAR_ALERTS) inst.alertLayer.addTo(map);
     alBtn.addEventListener("click",()=>{ RADAR_ALERTS=!RADAR_ALERTS; alBtn.textContent="Alert outlines: "+(RADAR_ALERTS?"on":"off"); alBtn.setAttribute("aria-pressed",String(RADAR_ALERTS)); RADAR_ALERTS?inst.alertLayer.addTo(map):inst.alertLayer.remove(); });
     if(!RADAR_ALERTS){ alBtn.textContent="Alert outlines: off"; alBtn.setAttribute("aria-pressed","false"); }
-    inst.ints.push(setInterval(drawAlerts,60000));
+    inst.ints.push(setInterval(drawAlerts,60000)); inst.drawAlerts=drawAlerts;
     inst.setFS=setFS; inst.fallback=fallback;
     buildFrames(); };
   inst.destroy=function(){ inst.dead=true; inst.timers.forEach(clearTimeout); inst.ints.forEach(clearInterval); if(inst.io) inst.io.disconnect(); if(inst.onKey) document.removeEventListener("keydown",inst.onKey); if(inst.fs) document.body.style.overflow=""; inst.frames.forEach(f=>{ if(f.layer){ f.layer.off(); try{ inst.map.removeLayer(f.layer); }catch(e){} } }); if(inst.map) inst.map.remove(); };
@@ -1324,10 +1362,884 @@ function radarSection(s){
   return section("Radar",c,"Radar from the Iowa Environmental Mesonet (National Weather Service NEXRAD), a new picture every 5 minutes. Click the map for full screen, then click an outline for details. Outlines are National Weather Service watches (dashed) and warnings (solid), colored by type. Snow shows in "+(IS_LIGHT?"blue, deeper where it is heavier":"blue and white")+", freezing rain in pink and sleet in purple. Faint blue echoes and isolated specks are often not rain, so they are hidden unless they are snow or ice.");
 }
 
+/* ---------- Custom location lookup (step 3a, 2026-11-19) ----------
+   Turns what the visitor typed into a spot on the map, then asks NWS which forecast area and time zone it is in.
+   Zip: Zippopotam. Airport code: NWS station lookup. Street address: Census (script-tag method, because the browser blocks the plain request).
+   City and state: Open-Meteo. Anything else (landmarks): Nominatim, one search per press of Look up, never while typing
+   (their rules: https://operations.osmfoundation.org/policies/nominatim/ , max 1 request a second, no search-as-you-type).
+   Answers are remembered in memory only, so the same search is not sent twice. Nothing is saved on the device. */
+const CV_SEQ={n:0}, CV_CACHE=new Map(); let CV_JP=0;
+const US_STATES={AL:"Alabama",AK:"Alaska",AZ:"Arizona",AR:"Arkansas",CA:"California",CO:"Colorado",CT:"Connecticut",DE:"Delaware",DC:"District of Columbia",FL:"Florida",GA:"Georgia",HI:"Hawaii",ID:"Idaho",IL:"Illinois",IN:"Indiana",IA:"Iowa",KS:"Kansas",KY:"Kentucky",LA:"Louisiana",ME:"Maine",MD:"Maryland",MA:"Massachusetts",MI:"Michigan",MN:"Minnesota",MS:"Mississippi",MO:"Missouri",MT:"Montana",NE:"Nebraska",NV:"Nevada",NH:"New Hampshire",NJ:"New Jersey",NM:"New Mexico",NY:"New York",NC:"North Carolina",ND:"North Dakota",OH:"Ohio",OK:"Oklahoma",OR:"Oregon",PA:"Pennsylvania",RI:"Rhode Island",SC:"South Carolina",SD:"South Dakota",TN:"Tennessee",TX:"Texas",UT:"Utah",VT:"Vermont",VA:"Virginia",WA:"Washington",WV:"West Virginia",WI:"Wisconsin",WY:"Wyoming",PR:"Puerto Rico"};
+const STATE_ABBR=Object.fromEntries(Object.entries(US_STATES).map(([a,n])=>[n.toLowerCase(),a]));
+/* Terrain for the sky banner: flat, rolling or mountains. One lookup of 81 ground heights (the place plus 16 directions at 5, 15, 30, 60 and 90 km) from Open-Meteo, judged by how bumpy it is nearby and how high the ground gets far away. The answer is kept per place (rounded to about a mile) so it is only asked once; if the lookup fails the banner stays flat and tries again next visit. */
+const CV_TERR_KEY="ss_terrain_v1", CV_TERR_TRIED=new Set();
+function cvTerrKey(lat,lon){ return Number(lat).toFixed(2)+","+Number(lon).toFixed(2); }
+function cvTerrCached(lat,lon){ try{ const o=JSON.parse(localStorage.getItem(CV_TERR_KEY)||"{}"); return o[cvTerrKey(lat,lon)]||null; }catch(e){ return null; } }
+function cvTerrSave(lat,lon,t){ try{ const o=JSON.parse(localStorage.getItem(CV_TERR_KEY)||"{}"), ks=Object.keys(o); if(ks.length>=300) delete o[ks[0]]; o[cvTerrKey(lat,lon)]=t; localStorage.setItem(CV_TERR_KEY,JSON.stringify(o)); }catch(e){} }
+function cvTerrJudge(el){
+  const q=(v,p)=>{ v=v.slice().sort((a,b)=>a-b); const i=(v.length-1)*p, lo=Math.floor(i), hi=Math.min(lo+1,v.length-1); return v[lo]+(v[hi]-v[lo])*(i-lo); };
+  const near=el.slice(0,49), far=el.slice(49), nearRel=q(near,0.9)-q(near,0.1), farRise=Math.max.apply(null,far)-el[0];
+  return (farRise>=900||nearRel>=250)?"mountains":((nearRel>=70||farRise>=250)?"rolling":"flat"); }
+async function cvTerrain(lat,lon){
+  const k=cvTerrKey(lat,lon), c=cvTerrCached(lat,lon); if(c) return c;
+  if(CV_TERR_TRIED.has(k)) return null; CV_TERR_TRIED.add(k);
+  try{ const pts=[[lat,lon]]; [5,15,30,60,90].forEach(r=>{ for(let i=0;i<16;i++){ const b=2*Math.PI*i/16; pts.push([lat+r/111.32*Math.cos(b),lon+r/(111.32*Math.cos(lat*Math.PI/180))*Math.sin(b)]); } });
+    const j=await cvGet("https://api.open-meteo.com/v1/elevation?latitude="+pts.map(p=>p[0].toFixed(4)).join(",")+"&longitude="+pts.map(p=>p[1].toFixed(4)).join(",")), el=j&&j.elevation;
+    if(!Array.isArray(el)||el.length!==81||el.some(v=>typeof v!=="number")) return null;
+    const t=cvTerrJudge(el); cvTerrSave(lat,lon,t); return t; }catch(e){ return null; } }
+async function cvGet(url){ const c=new AbortController(), t=setTimeout(()=>c.abort(),12000); try{ const r=await fetch(url,{signal:c.signal}); if(!r.ok){ const e=new Error("HTTP "+r.status); e.status=r.status; throw e; } return await r.json(); } finally{ clearTimeout(t); } }
+function cvJsonp(url){ return new Promise((res,rej)=>{ const cb="cvjp"+(++CV_JP)+"_"+Date.now(), sc=document.createElement("script"); const done=()=>{ clearTimeout(to); try{ delete window[cb]; }catch(e){ window[cb]=undefined; } sc.remove(); }; const to=setTimeout(()=>{ done(); rej(new Error("timed out")); },15000); window[cb]=d=>{ done(); res(d); }; sc.onerror=()=>{ done(); rej(new Error("script did not load")); }; sc.src=url+"&callback="+cb; document.head.appendChild(sc); }); }
+function cvAddr(s){ return String(s).split(", ").map((p,i,a)=>/^[A-Za-z]{2}$/.test(p)&&US_STATES[p.toUpperCase()]?p.toUpperCase():p.toLowerCase().replace(/\b([a-z])/g,(m,c)=>c.toUpperCase()).replace(/\b(Nw|Ne|Sw|Se)\b/g,x=>x.toUpperCase())).join(", "); }
+const notFound=e=>e&&e.status&&e.status>=400&&e.status<500;
+async function cvLookupZip(z){ try{ const j=await cvGet("https://api.zippopotam.us/us/"+z.slice(0,5)); const p=(j.places||[])[0]; if(!p) return []; return [{label:p["place name"]+", "+p["state abbreviation"],sub:"Zip "+z.slice(0,5)+" (the middle of the zip)",lat:+p.latitude,lon:+p.longitude,src:"zip"}]; }catch(e){ if(notFound(e)) return []; throw e; } }
+async function cvLookupAddress(q){ const j=await cvJsonp("https://geocoding.geo.census.gov/geocoder/locations/onelineaddress?benchmark=Public_AR_Current&format=jsonp&address="+encodeURIComponent(q)); const m=((j&&j.result&&j.result.addressMatches)||[]).map(x=>({label:cvAddr(x.matchedAddress),sub:"Street address",lat:x.coordinates.y,lon:x.coordinates.x,src:"census",st:(x.addressComponents&&x.addressComponents.state)||""})); m.sort((a,b)=>a.st<b.st?-1:a.st>b.st?1:0); if(m.length>1) await cvRankByPop(m); return m.slice(0,8); }
+async function cvRankByPop(m){ const cityOf=p=>{ const pt=p.label.split(", "); return pt.length>=3?pt[pt.length-3]:""; }; const names=[...new Set(m.map(cityOf).filter(Boolean))].slice(0,3); const pops={};
+  await Promise.all(names.map(async n=>{ try{ const j=await cvGet("https://geocoding-api.open-meteo.com/v1/search?count=50&language=en&format=json&countryCode=US&name="+encodeURIComponent(n)); (j.results||[]).forEach(x=>{ const ab=STATE_ABBR[(x.admin1||"").toLowerCase()]; if(ab&&typeof x.population==="number"&&String(x.name).toLowerCase()===n.toLowerCase()){ const k=n.toLowerCase()+"|"+ab; pops[k]=Math.max(pops[k]||0,x.population); } }); }catch(e){} }));
+  m.forEach(p=>{ p.pop=pops[cityOf(p).toLowerCase()+"|"+p.st]||0; if(p.pop) p.sub="Street address, city pop. "+p.pop.toLocaleString(); });
+  m.sort((a,b)=>(b.pop-a.pop)||(a.st<b.st?-1:a.st>b.st?1:0)); }
+async function cvLookupAirport(q){ const code=(q.length===3?"K":"")+q.toUpperCase(); try{ const j=await cvGet("https://api.weather.gov/stations/"+code); const g=j.geometry&&j.geometry.coordinates; if(!g) return []; return [{label:code+", "+(((j.properties||{}).name)||"airport"),sub:"Airport or weather station",lat:g[1],lon:g[0],src:"station"}]; }catch(e){ if(notFound(e)) return []; throw e; } }
+function cvParseCity(q){ let m=q.match(/^(.*?)[,\s]+([A-Za-z]{2})$/); if(m&&US_STATES[m[2].toUpperCase()]) return {city:m[1].trim().replace(/,$/,""),state:m[2].toUpperCase()}; m=q.match(/^(.*?),\s*([A-Za-z .]+)$/); if(m&&STATE_ABBR[m[2].trim().toLowerCase()]) return {city:m[1].trim(),state:STATE_ABBR[m[2].trim().toLowerCase()]}; return {city:q,state:null}; }
+async function cvLookupCity(city,state){ const j=await cvGet("https://geocoding-api.open-meteo.com/v1/search?count=10&language=en&format=json&countryCode=US&name="+encodeURIComponent(city)); let r=j.results||[]; if(state) r=r.filter(x=>(x.admin1||"").toLowerCase()===US_STATES[state].toLowerCase());
+  r=r.filter(x=>x.population||!r.some(y=>y!==x&&y.population&&y.admin1===x.admin1&&CV_MI(x.latitude,x.longitude,y.latitude,y.longitude)<=10));
+  r=r.map((x,i)=>[x,i]).sort((a,b)=>((b[0].population||0)-(a[0].population||0))||(a[1]-b[1])).map(a=>a[0]);
+  return r.slice(0,8).map(x=>({label:x.name+", "+(STATE_ABBR[(x.admin1||"").toLowerCase()]||x.admin1||""),sub:[x.admin2,x.population?"pop. "+x.population.toLocaleString():""].filter(Boolean).join(", ")||"City",lat:x.latitude,lon:x.longitude,src:"city",name:x.name,pop:typeof x.population==="number"?x.population:0})); }
+async function cvLookupPlace(q){ const j=await cvGet("https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&countrycodes=us&limit=5&q="+encodeURIComponent(q)); return j.map(x=>{ const a=x.address||{}; const where=[a.city||a.town||a.village||a.hamlet||a.county,STATE_ABBR[(a.state||"").toLowerCase()]||a.state].filter(Boolean).join(", "); const nm=x.name||(x.display_name||"").split(",")[0]; return {label:nm+(where?", "+where:""),sub:"Found with OpenStreetMap",lat:+x.lat,lon:+x.lon,src:"osm"}; }); }
+async function cvSearch(raw){
+  const q=raw.trim().replace(/\s+/g," "), key=q.toLowerCase();
+  if(CV_CACHE.has(key)) return CV_CACHE.get(key);
+  let picks=[];
+  if(/^\d{5}(-\d{4})?$/.test(q)) picks=await cvLookupZip(q);
+  else if(/^\d/.test(q)){ picks=await cvLookupAddress(q); if(!picks.length) picks=await cvLookupPlace(q); }
+  else if(/^[A-Za-z]{3,4}$/.test(q)){
+    const [a,c]=await Promise.allSettled([cvLookupAirport(q),cvLookupCity(q,null)]);
+    if(a.status==="rejected"&&c.status==="rejected") throw a.reason;
+    picks=[...(a.status==="fulfilled"?a.value:[]),...(c.status==="fulfilled"?c.value.filter(p=>String(p.name).toLowerCase()===key):[])];
+    if(!picks.length&&a.status==="fulfilled"&&c.status==="fulfilled") picks=await cvLookupPlace(q);
+  } else { const pc=cvParseCity(q); picks=await cvLookupCity(pc.city,pc.state); if(!picks.length) picks=await cvLookupPlace(q); }
+  CV_CACHE.set(key,picks); return picks;
+}
+async function cvPoint(pick){ const j=await cvGet("https://api.weather.gov/points/"+Number(pick.lat).toFixed(4)+","+Number(pick.lon).toFixed(4)); const p=j.properties||{}, rl=(p.relativeLocation&&p.relativeLocation.properties)||{}; return {title:rl.city?rl.city+", "+rl.state:pick.label,tz:p.timeZone,stationsUrl:p.observationStations,hourlyUrl:p.forecastHourly,forecastUrl:p.forecast,grid:p.gridId+" "+p.gridX+","+p.gridY,lat:Number(pick.lat),lon:Number(pick.lon),pop:pick.pop>0?pick.pop:null,pick}; }
+const cvTime=tz=>{ try{ return new Date().toLocaleTimeString([],{hour:"numeric",minute:"2-digit",timeZone:tz,timeZoneName:"short"}); }catch(e){ return ""; } };
+/* Step 3b: current conditions from nearby stations, with the model as a fallback. */
+const CV_MI=(a,b,c,d)=>{ const r=Math.PI/180,dl=(c-a)*r,dn=(d-b)*r,x=Math.sin(dl/2)**2+Math.cos(a*r)*Math.cos(c*r)*Math.sin(dn/2)**2; return 3958.8*2*Math.asin(Math.sqrt(x)); };
+const CV_MED=a=>{ const v=a.slice().sort((x,y)=>x-y),n=v.length; return n%2?v[(n-1)/2]:(v[n/2-1]+v[n/2])/2; };
+const CV_CODES={0:"Clear",1:"Mostly clear",2:"Partly cloudy",3:"Overcast",45:"Fog",48:"Fog",51:"Light drizzle",53:"Drizzle",55:"Heavy drizzle",56:"Freezing drizzle",57:"Freezing drizzle",61:"Light rain",63:"Rain",65:"Heavy rain",66:"Freezing rain",67:"Freezing rain",71:"Light snow",73:"Snow",75:"Heavy snow",77:"Snow grains",80:"Light showers",81:"Showers",82:"Heavy showers",85:"Snow showers",86:"Heavy snow showers",95:"Thunderstorm",96:"Thunderstorm with hail",99:"Thunderstorm with hail"};
+const cvVal=o=>(o&&typeof o.value==="number")?o.value:null;
+const cvDay=(ms,tz)=>new Intl.DateTimeFormat("en-CA",{timeZone:tz,year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date(ms));
+const cvNum=a=>a.filter(v=>v!==null&&v!==undefined&&isFinite(v));
+const cvMed=a=>{ a=cvNum(a); return a.length?CV_MED(a):null; };
+function cvFeels(t,w,rh){ if(t===null) return null;
+  if(t<=50&&w>3){ const v=Math.pow(w,0.16); return 35.74+0.6215*t-35.75*v+0.4275*t*v; }
+  if(t>=80&&rh!==null){ const R=rh, hi=-42.379+2.04901523*t+10.14333127*R-0.22475541*t*R-0.00683783*t*t-0.05481717*R*R+0.00122874*t*t*R+0.00085282*t*R*R-0.00000199*t*t*R*R; return Math.max(t,hi); }
+  return t; }
+async function cvConditions(pl){
+  const now=Date.now(); let stations=[];
+  try{
+    const sj=await cvGet(pl.stationsUrl+"?limit=25");
+    stations=(sj.features||[]).map(f=>{ const g=(f.geometry&&f.geometry.coordinates)||[], p=f.properties||{}; return {id:p.stationIdentifier,name:p.name,d:CV_MI(pl.lat,pl.lon,g[1],g[0]),el:cvVal(p.elevation)}; }).filter(x=>x.id&&isFinite(x.d)).sort((a,b)=>a.d-b.d).slice(0,8);
+  }catch(e){ stations=[]; }
+  const reads=await Promise.all(stations.map(async st=>{ try{
+    const j=await cvGet("https://api.weather.gov/stations/"+encodeURIComponent(st.id)+"/observations?limit=8");
+    for(const f of (j.features||[])){ const p=f.properties||{};
+      const t=cvVal(p.temperature), w=cvVal(p.windSpeed), ts=Date.parse(p.timestamp);
+      if(t===null||w===null||!isFinite(ts)) continue;
+      const age=(now-ts)/60000; if(age>120) return null; if(age<-10) continue;
+      const g=cvVal(p.windGust), sl=cvVal(p.seaLevelPressure), bp=cvVal(p.barometricPressure);
+      let pr=null; if(sl!==null) pr=sl/3386.389; else if(bp!==null) pr=bp/3386.389;   /* airport barometricPressure is already the sea-level altimeter setting, so no elevation correction */
+      if(pr!==null&&(pr<27||pr>32)) pr=null;
+      return {st,ts,age:Math.max(0,age),t:t*9/5+32,w:w/1.609344,g:g===null?null:g/1.609344,dir:cvVal(p.windDirection),rh:cvVal(p.relativeHumidity),pr,txt:p.textDescription||""};
+    }
+    return null;
+  }catch(e){ return null; } }));
+  const ok=reads.filter(Boolean);
+  if(ok.length){
+    const use=ok.filter(r=>r.st.d<=ok[0].st.d+2), tt=use.map(r=>r.t), tx=use.find(r=>r.txt);
+    let txt=tx?tx.txt:"";
+    if(!txt&&pl.hourlyUrl){ try{ const h=await cvGet(pl.hourlyUrl); const per=(h.properties&&h.properties.periods||[])[0]; if(per&&per.shortForecast) txt=per.shortForecast; }catch(e){} }
+    const dv=use.filter(r=>r.dir!==null&&r.w>=1); let dir=null; if(dv.length){ let x=0,y=0; dv.forEach(r=>{ x+=Math.sin(r.dir*Math.PI/180); y+=Math.cos(r.dir*Math.PI/180); }); dir=(Math.atan2(x,y)*180/Math.PI+360)%360; }
+    return {kind:"stations",n:use.length,near:ok[0].st,dmin:Math.min(...use.map(r=>r.st.d)),dmax:Math.max(...use.map(r=>r.st.d)),t:CV_MED(tt),tmin:Math.min(...tt),tmax:Math.max(...tt),w:CV_MED(use.map(r=>r.w)),g:cvMed(use.map(r=>r.g)),dir,rh:cvMed(use.map(r=>r.rh)),pr:cvMed(use.map(r=>r.pr)),txt,age:Math.min(...use.map(r=>r.age)),newest:Math.max(...use.map(r=>r.ts)),used:use.map(r=>r.st.id)};
+  }
+  const j=await cvGet("https://api.open-meteo.com/v1/forecast?latitude="+pl.lat.toFixed(4)+"&longitude="+pl.lon.toFixed(4)+"&current=temperature_2m,relative_humidity_2m,wind_speed_10m,wind_direction_10m,wind_gusts_10m,pressure_msl,weather_code&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=auto");
+  const c=j.current||{}; if(typeof c.temperature_2m!=="number") throw new Error("no data");
+  return {kind:"model",t:c.temperature_2m,w:c.wind_speed_10m,g:c.wind_gusts_10m,dir:typeof c.wind_direction_10m==="number"?c.wind_direction_10m:null,rh:typeof c.relative_humidity_2m==="number"?c.relative_humidity_2m:null,pr:typeof c.pressure_msl==="number"?c.pressure_msl/33.8639:null,txt:CV_CODES[c.weather_code]||"",used:[]};
+}
+/* Today's high and low and the 3-hour change, from the same stations' last 30 hours of reports. */
+async function cvHistory(ids,tz){
+  const start=new Date(Date.now()-30*3600000).toISOString().replace(/\.\d+Z$/,"Z"), today=cvDay(Date.now(),tz), target=Date.now()-3*3600000;
+  const per=await Promise.all(ids.map(async id=>{ try{ const j=await cvGet("https://api.weather.gov/stations/"+encodeURIComponent(id)+"/observations?start="+start+"&limit=300");
+    return (j.features||[]).map(f=>{ const p=f.properties||{}, t=cvVal(p.temperature), ts=Date.parse(p.timestamp); return t===null||!isFinite(ts)?null:{ts,t:t*9/5+32}; }).filter(Boolean); }catch(e){ return null; } }));
+  const ok=per.filter(a=>a&&a.length); if(!ok.length) return null;
+  const his=[],los=[],ago=[];
+  ok.forEach(a=>{ const td=a.filter(r=>cvDay(r.ts,tz)===today); if(td.length){ his.push(Math.max(...td.map(r=>r.t))); los.push(Math.min(...td.map(r=>r.t))); }
+    let best=null; a.forEach(r=>{ if(Math.abs(r.ts-target)<=45*60000&&(!best||Math.abs(r.ts-target)<Math.abs(best.ts-target))) best=r; }); if(best) ago.push(best.t); });
+  return {hi:his.length?CV_MED(his):null,lo:los.length?CV_MED(los):null,ago:ago.length?CV_MED(ago):null};
+}
+/* Rain and snow since local midnight. Modeled (Open-Meteo), because most NWS stations do not report a rain amount. */
+async function cvPrecipToday(pl,tz){
+  const j=await cvGet("https://api.open-meteo.com/v1/forecast?latitude="+pl.lat.toFixed(4)+"&longitude="+pl.lon.toFixed(4)+"&hourly=precipitation,snowfall&precipitation_unit=inch&timezone="+encodeURIComponent(tz)+"&past_days=1&forecast_days=1");
+  const h=j.hourly||{}, T=h.time||[], P=h.precipitation||[], S=h.snowfall||[]; if(!T.length) throw new Error("no data");
+  const pt=new Intl.DateTimeFormat("en-CA",{timeZone:tz,year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",hourCycle:"h23"}).formatToParts(new Date()).reduce((o,x)=>{ o[x.type]=x.value; return o; },{});
+  const today=pt.year+"-"+pt.month+"-"+pt.day, nowH=today+"T"+pt.hour; let w=0,sn=0;
+  T.forEach((t,i)=>{ if(t.slice(0,10)===today&&t.slice(11,13)!=="00"&&t.slice(0,13)<=nowH){ w+=P[i]||0; sn+=S[i]||0; } });
+  return {water:w,snow:sn,rain:Math.max(0,w-sn/SNOW_PER_WATER)};
+}
+/* Step 4: alerts for the exact spot. Same rules as wx_alerts.py and build_dashboard.py (NWS color guide copied from nws_alert_colors.json;
+   if that file changes, update CV_AC too). Nothing is stored on the device. */
+const CV_AC={"types":{"Tsunami Warning":[1,"#FD6347"],"Tornado Warning":[2,"#FF0000"],"Extreme Wind Warning":[3,"#FF8C00"],"Severe Thunderstorm Warning":[4,"#FFA500"],"Flash Flood Warning":[5,"#8B0000"],"Flash Flood Statement":[6,"#8B0000"],"Severe Weather Statement":[7,"#00FFFF"],"Shelter In Place Warning":[8,"#FA8072"],"Evacuation Immediate":[9,"#7FFF00"],"Civil Danger Warning":[10,"#FFB6C1"],"Nuclear Power Plant Warning":[11,"#4B0082"],"Radiological Hazard Warning":[12,"#4B0082"],"Hazardous Materials Warning":[13,"#4B0082"],"Fire Warning":[14,"#A0522D"],"Civil Emergency Message":[15,"#FFB6C1"],"Law Enforcement Warning":[16,"#C0C0C0"],"Storm Surge Warning":[17,"#B524F7"],"Hurricane Force Wind Warning":[18,"#CD5C5C"],"Hurricane Warning":[19,"#DC143C"],"Typhoon Warning":[20,"#DC143C"],"Special Marine Warning":[21,"#FFA500"],"Blizzard Warning":[22,"#FF4500"],"Snow Squall Warning":[23,"#C71585"],"Ice Storm Warning":[24,"#8B008B"],"Heavy Freezing Spray Warning":[25,"#00BFFF"],"Winter Storm Warning":[26,"#FF69B4"],"Lake Effect Snow Warning":[27,"#008B8B"],"Dust Storm Warning":[28,"#FFE4C4"],"Blowing Dust Warning":[29,"#FFE4C4"],"High Wind Warning":[30,"#DAA520"],"Tropical Storm Warning":[31,"#B22222"],"Storm Warning":[32,"#9400D3"],"Tsunami Advisory":[33,"#D2691E"],"Tsunami Watch":[34,"#FF00FF"],"Avalanche Warning":[35,"#1E90FF"],"Earthquake Warning":[36,"#8B4513"],"Volcano Warning":[37,"#2F4F4F"],"Ashfall Warning":[38,"#A9A9A9"],"Flood Warning":[39,"#00FF00"],"Coastal Flood Warning":[40,"#228B22"],"Lakeshore Flood Warning":[41,"#228B22"],"Ashfall Advisory":[42,"#696969"],"High Surf Warning":[43,"#228B22"],"Excessive Heat Warning":[44,"#C71585"],"Tornado Watch":[45,"#FFFF00"],"Severe Thunderstorm Watch":[46,"#DB7093"],"Flash Flood Watch":[47,"#2E8B57"],"Gale Warning":[48,"#DDA0DD"],"Flood Statement":[49,"#00FF00"],"Extreme Cold Warning":[50,"#0000FF"],"Freeze Warning":[51,"#483D8B"],"Red Flag Warning":[52,"#FF1493"],"Storm Surge Watch":[53,"#DB7FF7"],"Hurricane Watch":[54,"#FF00FF"],"Hurricane Force Wind Watch":[55,"#9932CC"],"Typhoon Watch":[56,"#FF00FF"],"Tropical Storm Watch":[57,"#F08080"],"Storm Watch":[58,"#FFE4B5"],"Tropical Cyclone Local Statement":[59,"#FFE4B5"],"Winter Weather Advisory":[60,"#7B68EE"],"Avalanche Advisory":[61,"#CD853F"],"Cold Weather Advisory":[62,"#AFEEEE"],"Heat Advisory":[63,"#FF7F50"],"Flood Advisory":[64,"#00FF7F"],"Coastal Flood Advisory":[65,"#7CFC00"],"Lakeshore Flood Advisory":[66,"#7CFC00"],"High Surf Advisory":[67,"#BA55D3"],"Dense Fog Advisory":[68,"#708090"],"Dense Smoke Advisory":[69,"#F0E68C"],"Small Craft Advisory":[70,"#D8BFD8"],"Brisk Wind Advisory":[71,"#D8BFD8"],"Hazardous Seas Warning":[72,"#D8BFD8"],"Dust Advisory":[73,"#BDB76B"],"Blowing Dust Advisory":[74,"#BDB76B"],"Lake Wind Advisory":[75,"#D2B48C"],"Wind Advisory":[76,"#D2B48C"],"Frost Advisory":[77,"#6495ED"],"Freezing Fog Advisory":[78,"#008080"],"Freezing Spray Advisory":[79,"#00BFFF"],"Low Water Advisory":[80,"#A52A2A"],"Local Area Emergency":[81,"#C0C0C0"],"Winter Storm Watch":[82,"#4682B4"],"Rip Current Statement":[83,"#40E0D0"],"Beach Hazards Statement":[84,"#40E0D0"],"Gale Watch":[85,"#FFC0CB"],"Avalanche Watch":[86,"#F4A460"],"Hazardous Seas Watch":[87,"#483D8B"],"Heavy Freezing Spray Watch":[88,"#BC8F8F"],"Flood Watch":[89,"#2E8B57"],"Coastal Flood Watch":[90,"#66CDAA"],"Lakeshore Flood Watch":[91,"#66CDAA"],"High Wind Watch":[92,"#B8860B"],"Excessive Heat Watch":[93,"#800000"],"Extreme Cold Watch":[94,"#5F9EA0"],"Freeze Watch":[95,"#00FFFF"],"Fire Weather Watch":[96,"#FFDEAD"],"Extreme Fire Danger":[97,"#E9967A"],"911 Telephone Outage":[98,"#C0C0C0"],"Coastal Flood Statement":[99,"#6B8E23"],"Lakeshore Flood Statement":[100,"#6B8E23"],"Special Weather Statement":[101,"#FFE4B5"],"Marine Weather Statement":[102,"#FFDAB9"],"Air Quality Alert":[103,"#808080"],"Air Stagnation Advisory":[104,"#808080"],"Hazardous Weather Outlook":[105,"#EEE8AA"],"Hydrologic Outlook":[106,"#90EE90"],"Short Term Forecast":[107,"#98FB98"],"Administrative Message":[108,"#C0C0C0"],"Test":[109,"#F0FFFF"],"Child Abduction Emergency":[110,"#FFFFFF"],"Blue Alert":[111,"#FFFFFF"]},"aliases":{"Extreme Heat Warning":"Excessive Heat Warning","Extreme Heat Watch":"Excessive Heat Watch"},"hidden":["Test","Administrative Message","911 Telephone Outage","Short Term Forecast","Hazardous Weather Outlook","Hydrologic Outlook","Child Abduction Emergency","Blue Alert"],"pairs":{"Tornado Watch":["Tornado Warning"],"Severe Thunderstorm Watch":["Severe Thunderstorm Warning"],"Flash Flood Watch":["Flash Flood Warning"],"Flood Watch":["Flood Warning"],"Winter Storm Watch":["Winter Storm Warning","Blizzard Warning","Ice Storm Warning","Lake Effect Snow Warning"],"High Wind Watch":["High Wind Warning"],"Freeze Watch":["Freeze Warning"],"Extreme Heat Watch":["Extreme Heat Warning","Excessive Heat Warning"],"Excessive Heat Watch":["Extreme Heat Warning","Excessive Heat Warning"],"Extreme Cold Watch":["Extreme Cold Warning"],"Fire Weather Watch":["Red Flag Warning"],"Coastal Flood Watch":["Coastal Flood Warning"],"Lakeshore Flood Watch":["Lakeshore Flood Warning"],"Hurricane Watch":["Hurricane Warning"],"Hurricane Force Wind Watch":["Hurricane Force Wind Warning"],"Tropical Storm Watch":["Tropical Storm Warning"],"Typhoon Watch":["Typhoon Warning"],"Storm Surge Watch":["Storm Surge Warning"],"Gale Watch":["Gale Warning"],"Storm Watch":["Storm Warning"],"Avalanche Watch":["Avalanche Warning"],"Hazardous Seas Watch":["Hazardous Seas Warning"],"Heavy Freezing Spray Watch":["Heavy Freezing Spray Warning"],"Tsunami Watch":["Tsunami Warning"]},"unknown":[500,"#808080"]};
+function cvAlertLook(h){ const c=[1,3,5].map(i=>parseInt(h.slice(i,i+2),16)), CARD=[28,27,37], S=0.8, base=c.map((v,i)=>v*S+CARD[i]*(1-S));
+  const lin=v=>{ v/=255; return v<=0.03928?v/12.92:Math.pow((v+0.055)/1.055,2.4); }, lum=r=>0.2126*lin(r[0])+0.7152*lin(r[1])+0.0722*lin(r[2]);
+  const hx=r=>"#"+r.map(v=>Math.max(0,Math.min(255,Math.round(v))).toString(16).padStart(2,"0")).join("");
+  if(lum(base)>0.35) return [hx(base),"#000000"]; let f=1; while(1.05/(lum(base.map(v=>v*f))+0.05)<5.5&&f>0.2) f-=0.02; return [hx(base.map(v=>v*f)),"#ffffff"]; }
+function cvTidyAlerts(features,now){
+  const C=CV_AC, hidden=new Set(C.hidden), out=[], seen=new Set(), ep=x=>{ const v=Date.parse(x); return isFinite(v)?Math.floor(v/1000):null; };
+  for(const ft of (features||[])){ const p=(ft&&ft.properties)||{}, ev=p.event, aid=p.id||(ft&&ft.id);
+    if(!ev||!aid||seen.has(aid)) continue;
+    if(p.status!==undefined&&p.status!==null&&p.status!=="Actual") continue;
+    if(p.messageType==="Cancel"||hidden.has(ev)) continue;
+    seen.add(aid);
+    const t=C.types[C.aliases[ev]||ev]||C.unknown, start=ep(p.onset)||ep(p.effective), end=ep(p.ends)||ep(p.expires);
+    if(end!==null&&end<=now) continue;
+    const refs=p.references||[], fr=refs[0]&&refs[0].identifier, lk=cvAlertLook(t[1]);
+    out.push({key:fr||aid,event:ev,pri:t[0],hex:t[1],start,end,sender:p.senderName,area:p.areaDesc,headline:p.headline,description:p.description,instruction:p.instruction,fill:lk[0],fg:lk[1]});
+  }
+  out.forEach(a=>{ const w=C.pairs[a.event]; if(w){ const ids=out.filter(x=>w.indexOf(x.event)>=0).map(x=>x.key); if(ids.length) a.supersededBy=ids; } });
+  out.sort((a,b)=>(a.pri-b.pri)||((a.end===null?1e15:a.end)-(b.end===null?1e15:b.end))||(a.event<b.event?-1:a.event>b.event?1:0));
+  return out;
+}
+/* Custom location view. The box, the pick list and the place name with its local time. Weather comes in step 3b. */
+
+/* ---- step 5: hourly and daily forecast for a custom place. A JavaScript copy of the rules in build_dashboard.py (_nws_kind, _nws_kind_for_day, _extra_text, forecast_for, hourly_for). Keep them in sync. ---- */
+const CV_WET=["rain","storm","snow","mix"];
+function cvKind(icon){
+  const m=/\/icons\/land\/(day|night)\/([a-z_]+)/.exec(icon||""); if(!m) return "cloud"; const c=m[2], day=m[1]==="day";
+  if(c.startsWith("wind")) return "wind";
+  if(/^(tsra|tornado|hurricane|tropical)/.test(c)) return "storm";
+  if(c==="snow"||c==="blizzard") return "snow";
+  if(["rain_snow","rain_sleet","snow_sleet","fzra","rain_fzra","snow_fzra","sleet"].includes(c)) return "mix";
+  if(c.startsWith("rain")) return "rain";
+  if(["fog","haze","smoke","dust"].includes(c)) return "fog";
+  if(["skc","hot","cold"].includes(c)) return day?"sun":"moon";
+  if(["few","sct"].includes(c)) return day?"partday":"partnight";
+  return "cloud";
+}
+function cvKindDay(icon,pop){
+  const m=/\/icons\/land\/(day|night)\/([^?]+)/.exec(icon||""); if(!m) return "cloud";
+  const kinds=m[2].split("/").filter(Boolean).map(c=>cvKind("/icons/land/"+m[1]+"/"+c.split(",")[0]));
+  if(!kinds.length) return "cloud"; if(kinds.length===1) return kinds[0];
+  const wet=kinds.filter(k=>CV_WET.includes(k)), dry=kinds.filter(k=>!CV_WET.includes(k));
+  if(pop!==null&&pop!==undefined&&pop>=30&&wet.length) return wet[0];
+  return dry.length?dry[0]:kinds[0];
+}
+const CV_SKY="(sunny|mostly sunny|partly sunny|mostly cloudy|partly cloudy|cloudy|clear|mostly clear|increasing clouds|becoming cloudy|becoming sunny)";
+const cvWords=x=>String(x||"").toLowerCase().replace(/[^a-z ]/g," ").split(/\s+/).filter(w=>w&&!["a","an","the","of"].includes(w));
+const cvSents=x=>String(x||"").trim().replace(/([.!?])\s+/g,"$1\u0001").split("\u0001").filter(Boolean);
+function cvExtra(text,phrase){
+  const pw=cvWords(phrase), segs=[pw.join(" ")];
+  const ti=pw.indexOf("then"); if(ti>=0){ segs.push(pw.slice(0,ti).join(" "),pw.slice(ti+1).join(" ")); }
+  const out=[];
+  for(const sent of cvSents(text)){
+    const s=sent.trim(); if(!s) continue; const core=s.replace(/\.+$/,""); let m;
+    if(/^Chance of precipitation is \d+%$/i.test(core)) continue;
+    if(/^(?:[A-Za-z]+ ){0,3}wind (?:around |near )?\d+(?: to \d+)? mph$/i.test(core)) continue;
+    if(/^(?:Calm|Light and variable) wind$/i.test(core)) continue;
+    m=/gusts as high as (\d+) mph/i.exec(s);
+    if(m&&/^(?:[A-Za-z]+ ){0,3}wind/i.test(s)&&!/^Winds? could/i.test(s)){ out.push("Gusts as high as "+m[1]+" mph."); continue; }
+    if(new RegExp("^"+CV_SKY+"$","i").test(core)) continue;
+    if(/^[A-Za-z ,]+?, with a (?:high|low) (?:near|around) -?\d+$/i.test(core)) continue;
+    if(/^(?:High|Low) (?:near|around) -?\d+$/i.test(core)) continue;
+    m=/^(?:High|Low) (?:near|around) -?\d+, with (.+)$/i.exec(core);
+    if(m){ const r=m[1]; out.push(r[0].toUpperCase()+r.slice(1)+"."); continue; }
+    if(pw.length&&segs.includes(cvWords(core).join(" "))) continue;
+    out.push(s);
+  }
+  return out.join(" ");
+}
+const cvPop=p=>{ const v=p&&p.probabilityOfPrecipitation&&p.probabilityOfPrecipitation.value; return v===undefined?null:v; };
+const cvWind=x=>{ const n=(String(x||"").match(/\d+/g)||[]).map(Number); return n.length?Math.max(...n):null; };
+function cvHours(periods){
+  return periods.slice(0,54).map(p=>({t:p.startTime,temp:p.temperature,pop:cvPop(p),wind:cvWind(p.windSpeed),dir:p.windDirection,kind:cvKind(p.icon),text:p.shortForecast}));
+}
+function cvDays(periods){
+  const by={}; periods.forEach(p=>{ (by[p.startTime.slice(0,10)]=by[p.startTime.slice(0,10)]||[]).push(p); });
+  return Object.keys(by).sort().slice(0,7).map(date=>{
+    const ps=by[date], dayP=ps.find(p=>p.isDaytime), nights=ps.filter(p=>!p.isDaytime), nightP=nights.length?nights[nights.length-1]:null, main=dayP||nightP;
+    const pops=ps.map(cvPop).filter(x=>x!==null), rain=pops.length?Math.max(...pops):null;
+    let icon=cvKindDay(main.icon,cvPop(main)), text=cvExtra(main.detailedForecast,main.shortForecast), phrase=main.shortForecast;
+    if(dayP&&nightP&&rain!==null&&rain>=30&&!CV_WET.includes(icon)){
+      const nOwn=cvPop(nightP), nKind=cvKindDay(nightP.icon,nOwn);
+      if(CV_WET.includes(nKind)&&nOwn!==null&&nOwn>=30){
+        icon=nKind; phrase=(phrase||"")+", then "+(nightP.shortForecast||"rain").split(" then ").pop();
+        const sents=cvSents(cvExtra(nightP.detailedForecast,nightP.shortForecast)).filter(x=>x&&!text.includes(x));
+        text=(text?text+" ":"")+"That night: "+(sents.length?sents.join(" "):(nightP.shortForecast||"Rain")+".");
+      }
+    }
+    return {day:new Date(date+"T12:00:00Z").toLocaleDateString("en-US",{weekday:"long",timeZone:"UTC"}),date:date,tonight:!dayP,hi:dayP?dayP.temperature:null,lo:nightP?nightP.temperature:null,text:text,rainChance:rain,phrase:phrase,wind:cvWind(main.windSpeed),windDir:main.windDirection||"",icon:icon};
+  });
+}
+async function cvForecast(pl){
+  const no=()=>Promise.reject(new Error("no address"));
+  const [h,d]=await Promise.allSettled([pl.hourlyUrl?cvGet(pl.hourlyUrl):no(),pl.forecastUrl?cvGet(pl.forecastUrl):no()]);
+  const hp=h.status==="fulfilled"?((h.value.properties||{}).periods||[]):[], dp=d.status==="fulfilled"?((d.value.properties||{}).periods||[]):[];
+  const hours=hp.length?cvHours(hp):null, days=dp.length?cvDays(dp):null;
+  if(!hours&&!days) throw new Error("no forecast");
+  return {hours:hours,days:days};
+}
+
+/* ---- step 6: watch and warning outlines for a custom radar. Same rules as wx_alert_shapes.py, except zone lists are not merged into one outline (that needs a geometry library). ---- */
+const CV_ZONES=new Map();     /* zone address -> outlines, kept while the page is open */
+function cvDP(pts,tol){
+  const n=pts.length; if(n<3) return pts; const keep=new Array(n).fill(false); keep[0]=keep[n-1]=true; const st=[[0,n-1]];
+  while(st.length){ const [a,b]=st.pop(); let best=0, idx=-1; const ay=pts[a][0], ax=pts[a][1], dy=pts[b][0]-ay, dx=pts[b][1]-ax, L=dy*dy+dx*dx;
+    for(let k=a+1;k<b;k++){ const py=pts[k][0], px=pts[k][1]; let d; if(L===0) d=Math.hypot(py-ay,px-ax); else { const u=Math.max(0,Math.min(1,((py-ay)*dy+(px-ax)*dx)/L)); d=Math.hypot(py-(ay+u*dy),px-(ax+u*dx)); } if(d>best){ best=d; idx=k; } }
+    if(best>tol&&idx>0){ keep[idx]=true; st.push([a,idx],[idx,b]); } }
+  return pts.filter((_,i)=>keep[i]);
+}
+function cvPolys(g){
+  if(!g||typeof g!=="object") return []; const c=g.coordinates, polys=g.type==="Polygon"?[c]:(g.type==="MultiPolygon"?c:[]), out=[];
+  for(const poly of polys||[]){ const rings=[]; for(const ring of poly){ let pts=ring.filter(p=>Array.isArray(p)&&p.length>=2).map(p=>[Math.round(p[1]*1000)/1000,Math.round(p[0]*1000)/1000]); pts=cvDP(pts,0.004); if(pts.length>=4) rings.push(pts); } if(rings.length) out.push(rings); }
+  return out;
+}
+function cvNear(polys,lat,lon,miles){
+  let a=1e9,b=1e9,c=-1e9,d=-1e9; polys.forEach(po=>po.forEach(r=>r.forEach(p=>{ if(p[0]<a)a=p[0]; if(p[1]<b)b=p[1]; if(p[0]>c)c=p[0]; if(p[1]>d)d=p[1]; }))); if(a>c) return false;
+  const dl=miles/69, dn=miles/(69*Math.max(0.2,Math.cos(lat*Math.PI/180))); return a-dl<=lat&&lat<=c+dl&&b-dn<=lon&&lon<=d+dn;
+}
+function cvInside(polys,lat,lon){
+  for(const po of polys){ const r=po[0]; let ins=false; for(let i=0,j=r.length-1;i<r.length;j=i++){ const yi=r[i][0], xi=r[i][1], yj=r[j][0], xj=r[j][1]; if((yi>lat)!==(yj>lat)&&lon<(xj-xi)*(lat-yi)/((yj-yi)||1e-12)+xi) ins=!ins; } if(ins) return true; }
+  return false;
+}
+/* Join a zone list into one outline (the library is polygon-clipping, MIT). Holes smaller than a hairline gap between neighbours are dropped. Any trouble: return null and the caller keeps separate zones. */
+function cvMerge(polys){
+  try{
+    if(typeof polygonClipping==="undefined"||polys.length<2) return null;
+    const inp=polys.map(po=>po.map(r=>r.map(p=>[p[1],p[0]])));
+    const u=polygonClipping.union(inp[0],...inp.slice(1)), ar=r=>{ let a=0; for(let i=0,j=r.length-1;i<r.length;j=i++) a+=r[j][0]*r[i][1]-r[i][0]*r[j][1]; return Math.abs(a/2); }, out=[];
+    for(const po of u){ const rings=[]; po.forEach((r,i)=>{ if(i>0&&ar(r)<0.0015) return; const pts=cvDP(r.map(p=>[Math.round(p[1]*1000)/1000,Math.round(p[0]*1000)/1000]),0.002); if(pts.length>=4) rings.push(pts); }); if(rings.length) out.push(rings); }
+    return out.length?out:null;
+  }catch(e){ return null; }
+}
+/* Rough box (south, north, west, east) of each state. Used to find which states are within 300 miles of a place, so a warning just across the state line is not missed. */
+const CV_BOX={AL:[30.2,35.0,-88.5,-84.9],AK:[51.2,71.4,-179.2,-129.9],AZ:[31.3,37.0,-114.8,-109.0],AR:[33.0,36.5,-94.6,-89.6],CA:[32.5,42.0,-124.5,-114.1],CO:[37.0,41.0,-109.1,-102.0],CT:[41.0,42.1,-73.7,-71.8],DE:[38.4,39.8,-75.8,-75.0],DC:[38.8,39.0,-77.1,-76.9],FL:[24.5,31.0,-87.6,-80.0],GA:[30.4,35.0,-85.6,-80.8],HI:[18.9,22.3,-160.3,-154.8],ID:[42.0,49.0,-117.2,-111.0],IL:[37.0,42.5,-91.5,-87.5],IN:[37.8,41.8,-88.1,-84.8],IA:[40.4,43.5,-96.6,-90.1],KS:[37.0,40.0,-102.1,-94.6],KY:[36.5,39.1,-89.6,-81.9],LA:[28.9,33.0,-94.0,-88.8],ME:[43.0,47.5,-71.1,-66.9],MD:[37.9,39.7,-79.5,-75.0],MA:[41.2,42.9,-73.5,-69.9],MI:[41.7,48.3,-90.4,-82.1],MN:[43.5,49.4,-97.2,-89.5],MS:[30.2,35.0,-91.7,-88.1],MO:[36.0,40.6,-95.8,-89.1],MT:[44.4,49.0,-116.1,-104.0],NE:[40.0,43.0,-104.1,-95.3],NV:[35.0,42.0,-120.0,-114.0],NH:[42.7,45.3,-72.6,-70.6],NJ:[38.9,41.4,-75.6,-73.9],NM:[31.3,37.0,-109.1,-103.0],NY:[40.5,45.0,-79.8,-71.9],NC:[33.8,36.6,-84.3,-75.5],ND:[45.9,49.0,-104.1,-96.6],OH:[38.4,42.0,-84.8,-80.5],OK:[33.6,37.0,-103.0,-94.4],OR:[42.0,46.3,-124.6,-116.5],PA:[39.7,42.3,-80.5,-74.7],RI:[41.1,42.0,-71.9,-71.1],SC:[32.0,35.2,-83.4,-78.5],SD:[42.5,45.9,-104.1,-96.4],TN:[35.0,36.7,-90.3,-81.6],TX:[25.8,36.5,-106.7,-93.5],UT:[37.0,42.0,-114.1,-109.0],VT:[42.7,45.0,-73.4,-71.5],VA:[36.5,39.5,-83.7,-75.2],WA:[45.5,49.0,-124.8,-116.9],WV:[37.2,40.6,-82.7,-77.7],WI:[42.5,47.1,-92.9,-86.8],WY:[41.0,45.0,-111.1,-104.1]};
+function cvStates(home,lat,lon,miles){
+  const out=[home], rad=Math.PI/180;
+  for(const k of Object.keys(CV_BOX)){ if(k===home) continue; const b=CV_BOX[k];
+    const la=Math.min(Math.max(lat,b[0]),b[1]), lo=Math.min(Math.max(lon,b[2]),b[3]);          /* closest point of that state's box to the place */
+    const dy=(la-lat)*69, dx=(lo-lon)*69*Math.cos(((la+lat)/2)*rad);
+    if(dx*dx+dy*dy<=miles*miles) out.push(k); }
+  return out;
+}
+async function cvShapes(pl){
+  const m=/,\s*([A-Z]{2})\s*$/.exec(pl.title||""); if(!m) throw new Error("no state");
+  const [aj,pj]=await Promise.allSettled([cvGet("https://api.weather.gov/alerts/active?area="+cvStates(m[1],pl.lat,pl.lon,300).join(",")),cvGet("https://api.weather.gov/alerts/active?point="+pl.lat.toFixed(4)+","+pl.lon.toFixed(4))]);
+  if(aj.status!=="fulfilled"||!Array.isArray(aj.value.features)) throw new Error("no alerts");
+  const here=new Set(pj.status==="fulfilled"?(pj.value.features||[]).map(f=>(f.properties&&f.properties.id)||f.id):[]);
+  const now=Math.floor(Date.now()/1000), C=CV_AC, hidden=new Set(C.hidden), ep=x=>{ const v=Date.parse(x); return isFinite(v)?Math.floor(v/1000):null; }, cand=[];
+  for(const ft of aj.value.features){ const p=(ft&&ft.properties)||{}, ev=p.event, aid=p.id||(ft&&ft.id);
+    if(!ev||!aid||!/ (Warning|Watch)$/.test(ev)||hidden.has(ev)) continue;
+    if((p.status!==undefined&&p.status!==null&&p.status!=="Actual")||p.messageType==="Cancel") continue;
+    const end=ep(p.ends)||ep(p.expires); if(end!==null&&end<=now) continue;
+    const t=C.types[C.aliases[ev]||ev]||C.unknown;
+    cand.push({pri:t[0],hex:t[1],aid:aid,ft:ft,p:p,ev:ev,end:end,kind:/ Watch$/.test(ev)?"watch":"warning",here:here.has(aid)});
+  }
+  cand.sort((a,b)=>(b.here-a.here)||(a.pri-b.pri)||(String(a.aid)<String(b.aid)?-1:1));
+  const need=[]; let budget=120;
+  for(const c of cand){ c.polys=cvPolys(c.ft.geometry); if(c.polys.length) continue; for(const zu of c.p.affectedZones||[]){ if(!CV_ZONES.has(zu)&&!need.includes(zu)&&budget>0){ need.push(zu); budget--; } } }
+  for(let i=0;i<need.length;i+=8){ await Promise.allSettled(need.slice(i,i+8).map(async zu=>{ const j=await cvGet(zu); CV_ZONES.set(zu,cvPolys(j&&j.geometry)); })); }
+  const shapes={};
+  for(const c of cand){ let polys=c.polys, zones=false, partial=false;
+    if(!polys.length){ zones=true; polys=[]; for(const zu of c.p.affectedZones||[]){ const z=CV_ZONES.get(zu); if(z===undefined) partial=true; else polys.push(...z); } }
+    if(zones&&polys.length>1){ const mg=cvMerge(polys); if(mg){ polys=mg; zones=false; } } else if(zones) zones=false;      /* merged: drawn like the station pages. Not merged: separate thin shapes */
+    if(!polys.length||!cvNear(polys,pl.lat,pl.lon,300)) continue;
+    shapes[c.aid]={id:c.aid,event:c.ev,kind:c.kind,pri:c.pri,hex:c.hex,end:c.end,headline:c.p.headline,area:(c.p.areaDesc||"").slice(0,200),partial:partial,zones:zones,polys:polys,hit:{__cv:cvInside(polys,pl.lat,pl.lon)}};
+  }
+  return {checked:now,shapes:shapes};
+}
+
+/* ---- step 7: daily summary for a custom place. The last 7 days from the same stations the tiles use: each station's own high, low and so on for the day, then the middle value. Rain and snow are modeled (Open-Meteo). ---- */
+async function cvObs(ids){
+  const start=new Date(Date.now()-(7*24+6)*3600000).toISOString().replace(/\.\d+Z$/,"Z");
+  return Promise.all(ids.map(async id=>{ try{
+    let url="https://api.weather.gov/stations/"+encodeURIComponent(id)+"/observations?start="+start+"&limit=500", all=[];
+    for(let pg=0;pg<3&&url;pg++){ const j=await cvGet(url), fs=j.features||[]; all.push(...fs); const nx=j.pagination&&j.pagination.next; url=(nx&&fs.length>=500)?nx:null; }
+    return all.map(f=>{ const p=f.properties||{}, t=cvVal(p.temperature), ts=Date.parse(p.timestamp); if(t===null||!isFinite(ts)) return null;
+      const w=cvVal(p.windSpeed), g=cvVal(p.windGust), sl=cvVal(p.seaLevelPressure), bp=cvVal(p.barometricPressure), dp=cvVal(p.dewpoint), rh=cvVal(p.relativeHumidity);
+      let pr=sl!==null?sl/3386.389:(bp!==null?bp/3386.389:null); if(pr!==null&&(pr<27||pr>32)) pr=null;
+      return {ts,t:t*9/5+32,dp:dp===null?null:dp*9/5+32,rh,w:w===null?null:w/1.609344,g:g===null?null:g/1.609344,dir:cvVal(p.windDirection),pr}; }).filter(Boolean);
+  }catch(e){ return null; } }));
+}
+function cvDirMean(list){ const v=list.filter(r=>r.dir!==null&&r.w!==null&&r.w>=1); if(!v.length) return null; let x=0,y=0; v.forEach(r=>{ x+=Math.sin(r.dir*Math.PI/180); y+=Math.cos(r.dir*Math.PI/180); }); return Math.round((Math.atan2(x,y)*180/Math.PI+360)%360); }
+const cvMax=a=>{ a=cvNum(a); return a.length?Math.max(...a):null; }, cvMin=a=>{ a=cvNum(a); return a.length?Math.min(...a):null; }, cvAvg=a=>{ a=cvNum(a); return a.length?a.reduce((s,v)=>s+v,0)/a.length:null; };
+function cvStationDay(rs){
+  const T=rs.map(r=>r.t), FL=rs.map(r=>cvFeels(r.t,r.w===null?0:r.w,r.rh)), DP=rs.map(r=>{ if(r.dp!==null) return r.dp; if(r.rh===null||r.rh<=0) return null; const c=(r.t-32)*5/9, a=Math.log(r.rh/100)+17.62*c/(243.12+c); return (243.12*a/(17.62-a))*9/5+32; });
+  return {hi:cvMax(T),lo:cvMin(T),avg:cvAvg(T),flHi:cvMax(FL),flLo:cvMin(FL),flAvg:cvAvg(FL),dpHi:cvMax(DP),dpLo:cvMin(DP),dpAvg:cvAvg(DP),
+    huHi:cvMax(rs.map(r=>r.rh)),huLo:cvMin(rs.map(r=>r.rh)),huAvg:cvAvg(rs.map(r=>r.rh)),wsHi:cvMax(rs.map(r=>r.w)),wsLo:cvMin(rs.map(r=>r.w)),wsAvg:cvAvg(rs.map(r=>r.w)),
+    gHi:cvMax(rs.map(r=>r.g)),gAvg:cvAvg(rs.map(r=>r.g)),wdir:cvDirMean(rs),pHi:cvMax(rs.map(r=>r.pr)),pLo:cvMin(rs.map(r=>r.pr))};
+}
+/* rain and snow per local day, modeled. Open-Meteo hourly values are for the hour that ENDS at the time shown, so the midnight slot belongs to the day before. */
+async function cvPrecipDays(pl,tz){
+  const j=await cvGet("https://api.open-meteo.com/v1/forecast?latitude="+pl.lat.toFixed(4)+"&longitude="+pl.lon.toFixed(4)+"&hourly=precipitation,snowfall&precipitation_unit=inch&timezone="+encodeURIComponent(tz)+"&past_days=7&forecast_days=1");
+  const h=j.hourly||{}, T=h.time||[], P=h.precipitation||[], S=h.snowfall||[]; if(!T.length) throw new Error("no data");
+  const pt=new Intl.DateTimeFormat("en-CA",{timeZone:tz,year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",hourCycle:"h23"}).formatToParts(new Date()).reduce((o,x)=>{ o[x.type]=x.value; return o; },{});
+  const nowH=pt.year+"-"+pt.month+"-"+pt.day+"T"+pt.hour, out={};
+  T.forEach((t,i)=>{ if(t.slice(0,13)>nowH) return; let d=t.slice(0,10); if(t.slice(11,13)==="00"){ const x=new Date(d+"T12:00:00Z"); x.setUTCDate(x.getUTCDate()-1); d=x.toISOString().slice(0,10); }
+    const o=out[d]=out[d]||{water:0,snow:0}; o.water+=P[i]||0; o.snow+=S[i]||0; });
+  return out;
+}
+async function cvSummary(pl,r){
+  const tz=pl.tz, today=cvDay(Date.now(),tz), want=[]; for(let i=6;i>=0;i--) want.push(cvDay(Date.now()-i*86400000,tz));
+  const [po,pj]=await Promise.allSettled([r.kind==="stations"&&r.used.length?cvObs(r.used):Promise.resolve(null),cvPrecipDays(pl,tz)]);
+  const prec=pj.status==="fulfilled"?pj.value:{}; let rows=[], modeled=false;
+  const per=po.status==="fulfilled"&&po.value?po.value.filter(a=>a&&a.length):[];
+  if(r.kind=="stations"){
+    if(!per.length) throw new Error("no history");
+    want.forEach(date=>{ const sd=per.map(a=>a.filter(x=>cvDay(x.ts,tz)===date)).filter(a=>a.length>=4).map(cvStationDay); if(!sd.length) return;
+      const m=k=>cvMed(sd.map(x=>x[k])); rows.push({date,partial:date===today,hi:m("hi"),lo:m("lo"),avg:m("avg"),flHi:m("flHi"),flLo:m("flLo"),flAvg:m("flAvg"),dpHi:m("dpHi"),dpLo:m("dpLo"),dpAvg:m("dpAvg"),huHi:m("huHi"),huLo:m("huLo"),huAvg:m("huAvg"),wsHi:m("wsHi"),wsLo:m("wsLo"),wsAvg:m("wsAvg"),gHi:m("gHi"),gAvg:m("gAvg"),
+        wdir:cvDirMean(sd.map(x=>({dir:x.wdir,w:1}))),pHi:m("pHi"),pLo:m("pLo"),n:sd.length}); });
+  } else {
+    modeled=true;
+    const j=await cvGet("https://api.open-meteo.com/v1/forecast?latitude="+pl.lat.toFixed(4)+"&longitude="+pl.lon.toFixed(4)+"&daily=temperature_2m_max,temperature_2m_min,apparent_temperature_max,apparent_temperature_min,wind_speed_10m_max,wind_gusts_10m_max&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone="+encodeURIComponent(tz)+"&past_days=6&forecast_days=1");
+    const d=j.daily||{}, D=d.time||[]; if(!D.length) throw new Error("no data");
+    D.forEach((date,i)=>rows.push({date,partial:date===today,hi:d.temperature_2m_max[i],lo:d.temperature_2m_min[i],avg:null,flHi:d.apparent_temperature_max[i],flLo:d.apparent_temperature_min[i],flAvg:null,dpHi:null,dpLo:null,dpAvg:null,huHi:null,huLo:null,huAvg:null,wsHi:d.wind_speed_10m_max[i],wsLo:null,wsAvg:null,gHi:d.wind_gusts_10m_max[i],gAvg:null,wdir:null,pHi:null,pLo:null}));
+    rows=rows.filter(x=>want.includes(x.date));
+  }
+  if(!rows.length) throw new Error("no days");
+  rows.forEach(x=>{ const p=prec[x.date]; if(p){ x.snow=p.snow; x.rain=Math.max(0,p.water-p.snow/SNOW_PER_WATER); } else { x.snow=null; x.rain=null; } });
+  return {rows,modeled,precip:pj.status==="fulfilled",n:per.length};
+}
+/* ---- sky: where the sun and moon are, the moon's phase, sunrise and sunset. Standard low-precision formulas worked out from the date, time and place alone (no network). Good to well under a degree for position and a minute or two for sunrise and sunset. Angles in degrees, compass azimuth (0 north, 90 east, 180 south, 270 west). ---- */
+const SKY_R=Math.PI/180, SKY_E=SKY_R*23.4397;
+function skySun(d){ const M=SKY_R*(357.5291+0.98560028*d), C=SKY_R*(1.9148*Math.sin(M)+0.02*Math.sin(2*M)+0.0003*Math.sin(3*M)), L=M+C+SKY_R*102.9372+Math.PI;
+  return {dec:Math.asin(Math.sin(SKY_E)*Math.sin(L)), ra:Math.atan2(Math.sin(L)*Math.cos(SKY_E),Math.cos(L)), dist:149598000}; }
+function skyMoon(d){ const L=SKY_R*(218.316+13.176396*d), M=SKY_R*(134.963+13.064993*d), F=SKY_R*(93.272+13.229350*d), l=L+SKY_R*6.289*Math.sin(M), b=SKY_R*5.128*Math.sin(F);
+  return {ra:Math.atan2(Math.sin(l)*Math.cos(SKY_E)-Math.tan(b)*Math.sin(SKY_E),Math.cos(l)), dec:Math.asin(Math.sin(b)*Math.cos(SKY_E)+Math.cos(b)*Math.sin(SKY_E)*Math.sin(l)), dist:385001-20905*Math.cos(M)}; }
+function skyAltAz(d,lat,lon,c,moon){
+  const phi=lat*SKY_R, H=SKY_R*(280.16+360.9856235*d)+lon*SKY_R-c.ra;
+  let alt=Math.asin(Math.sin(phi)*Math.sin(c.dec)+Math.cos(phi)*Math.cos(c.dec)*Math.cos(H));
+  if(moon) alt-=Math.asin(6371/c.dist)*Math.cos(alt);                                                  /* the moon is close enough to shift against the sky */
+  if(alt>-0.0175){ const h=Math.max(alt,0); alt+=0.0002967/Math.tan(h+0.00312536/(h+0.08901179)); }                       /* bending of light by the air, small near the horizon */
+  const az=Math.atan2(Math.sin(H),Math.cos(H)*Math.sin(phi)-Math.tan(c.dec)*Math.cos(phi))+Math.PI;
+  return {alt:alt/SKY_R, az:((az/SKY_R)%360+360)%360}; }
+/* ms: a time in milliseconds. Returns the sun and moon positions and the moon's phase (0 new, 0.25 first quarter, 0.5 full, 0.75 last quarter) and lit share (0 to 1). */
+function skyPos(ms,lat,lon){
+  const d=ms/86400000-0.5+2440588-2451545, s=skySun(d), m=skyMoon(d);
+  const phi=Math.acos(Math.sin(s.dec)*Math.sin(m.dec)+Math.cos(s.dec)*Math.cos(m.dec)*Math.cos(s.ra-m.ra)), inc=Math.atan2(s.dist*Math.sin(phi),m.dist-s.dist*Math.cos(phi)),
+    ang=Math.atan2(Math.cos(s.dec)*Math.sin(s.ra-m.ra),Math.sin(s.dec)*Math.cos(m.dec)-Math.cos(s.dec)*Math.sin(m.dec)*Math.cos(s.ra-m.ra));
+  const sun=skyAltAz(d,lat,lon,s,false), moon=skyAltAz(d,lat,lon,m,true);
+  moon.phase=0.5+0.5*inc*(ang<0?-1:1)/Math.PI; moon.lit=(1+Math.cos(inc))/2;
+  return {sun:sun,moon:moon}; }
+/* Sunrise and sunset around a moment: {prevRise,prevSet,nextRise,nextSet} in ms, null when the sun does not cross in that window (polar day or night). Steps of 4 minutes, then straight-line refinement. */
+function skyEvents(ms,lat,lon){
+  const out={prevRise:null,prevSet:null,nextRise:null,nextSet:null}, step=240000, lim=-0.833, a0=ms-26*3600000, a1=ms+26*3600000;
+  const alt=t=>{ const d=t/86400000-0.5+2440588-2451545, s=skySun(d), phi=lat*SKY_R, H=SKY_R*(280.16+360.9856235*d)+lon*SKY_R-s.ra; return Math.asin(Math.sin(phi)*Math.sin(s.dec)+Math.cos(phi)*Math.cos(s.dec)*Math.cos(H))/SKY_R; };
+  let t0=a0, v0=alt(t0);
+  for(let t=a0+step;t<=a1;t+=step){ const v=alt(t);
+    if((v0<lim)!==(v<lim)){ const x=Math.round(t0+(lim-v0)/(v-v0)*step), rise=v>v0;
+      if(x<=ms){ if(rise) out.prevRise=x; else out.prevSet=x; } else { if(rise&&out.nextRise===null) out.nextRise=x; if(!rise&&out.nextSet===null) out.nextSet=x; } }
+    t0=t; v0=v; }
+  return out; }
+
+/* ---- sky banner: the picture at the top of a "Right now" card. Sky color follows the real height of the sun. The sun and moon sit where they really are (looking south: east on the left, west on the right, height from altitude). The moon shows only in a dark sky and only its lit part. Stars are the same every time so nothing jumps at a refresh. ---- */
+const SKYB_SKY=[[-12,"#060a18"],[-6,"#243461"],[8,"#3f93dc"]], SKYB_GR=[[-12,"#04070f"],[-6,"#142018"],[8,"#3a6d46"]];
+/* color of the sky right at the horizon: lighter than overhead all day, and the sunrise/sunset colors (purple, pink, orange, peach) when the sun is within a few degrees of the horizon */
+const SKYB_HZN=[[-12,"#0b1432"],[-7,"#2c2d62"],[-4,"#8c4d84"],[-1.5,"#e46f6a"],[0.5,"#f7a050"],[3,"#f8c98a"],[8,"#cfe0ea"],[18,"#a9cdee"]];
+function skyRamp(alt,st){
+  const hx=h=>[1,3,5].map(i=>parseInt(h.slice(i,i+2),16));
+  if(alt<=st[0][0]) return st[0][1];
+  for(let i=1;i<st.length;i++) if(alt<=st[i][0]){ const t=(alt-st[i-1][0])/(st[i][0]-st[i-1][0]), a=hx(st[i-1][1]), b=hx(st[i][1]); return "rgb("+a.map((v,k)=>Math.round(v+(b[k]-v)*t)).join(",")+")"; }
+  return st[st.length-1][1]; }
+function skyMoonPath(x,y,r,p){                                /* only the lit part: p is the phase, 0 new, 0.5 full */
+  const k=Math.round(Math.abs(Math.cos(2*Math.PI*p))*r*100)/100;
+  return p<0.5?"M"+x+" "+(y-r)+"A"+r+" "+r+" 0 0 1 "+x+" "+(y+r)+"A"+k+" "+r+" 0 0 "+(p<0.25?0:1)+" "+x+" "+(y-r)
+              :"M"+x+" "+(y-r)+"A"+r+" "+r+" 0 0 0 "+x+" "+(y+r)+"A"+k+" "+r+" 0 0 "+(p>0.75?1:0)+" "+x+" "+(y-r); }
+/* The banner is drawn at the card's real width (one picture unit = one screen pixel), and drawn again when the width changes, so nothing is stretched or cropped on a phone or a wide screen. */
+const SKY_RO=window.ResizeObserver?new ResizeObserver(es=>es.forEach(e=>{ const b=e.target, w=Math.round(e.contentRect.width); if(b._fill&&w>=100&&Math.abs(w-b._w)>1) b._fill(w); })):null;
+/* ---- B3: how cloudy. Five levels that follow the National Weather Service bands (0 to 12.5%, 12.5 to 37.5%, 37.5 to 62.5%, 62.5 to 87.5%, 87.5 to 100% of the sky). The level comes from the weather words first, then the NWS sky cover percentage for this hour, then the forecast model's cloud cover. 0 means no information: no clouds are drawn. ---- */
+const SKY_COV=[0.05,0.25,0.5,0.75,1];
+const SKY_K=[0,1.6,1.5,2.0,2.2];     /* tuned so the drawn clouds cover about 5, 25, 50, 75 and 100% of the cloud band, the top 72 px of the sky (measured on the picture) */
+function skyLevelWords(txt){
+  const t=String(txt||"").toLowerCase(); if(!t) return null;
+  if(/mostly (sunny|clear)/.test(t)) return 2;
+  if(/few clouds/.test(t)) return 2;
+  if(/partly|intermittent|scattered clouds/.test(t)) return 3;
+  if(/mostly cloudy|broken/.test(t)) return 4;
+  if(/overcast|cloudy/.test(t)) return 5;
+  if(/sunny|clear|fair/.test(t)) return 1;
+  if(/chance|likely|isolated/.test(t)) return null;
+  if(/rain|drizzle|shower|thunder|storm|snow|sleet|flurr|freezing|ice|hail|fog/.test(t)) return 5;
+  return null; }
+const skyLevelPct=p=>p<12.5?1:p<37.5?2:p<62.5?3:p<87.5?4:5;
+const skyWords=(lv,alt)=>(alt>0?["Sunny","Mostly sunny","Partly sunny","Mostly cloudy","Cloudy"]:["Clear","Mostly clear","Partly cloudy","Mostly cloudy","Cloudy"])[lv-1];
+const cvIsoMs=s=>{ const m=/^P(?:(\d+)D)?(?:T(?:(\d+)H)?)?$/.exec(s||""); return m?((+m[1]||0)*24+(+m[2]||0))*3600000:null; };
+async function cvSky(pl,r){
+  const w=skyLevelWords(r.txt); if(w) return {lv:w,src:"words"};
+  try{ const j=await cvGet("https://api.weather.gov/gridpoints/"+pl.grid.replace(" ","/")), v=((j.properties||{}).skyCover||{}).values||[], now=Date.now();
+    for(const x of v){ const p=String(x.validTime||"").split("/"), st=Date.parse(p[0]), d=cvIsoMs(p[1]); if(isFinite(st)&&d!==null&&now>=st&&now<st+d&&typeof x.value==="number") return {lv:skyLevelPct(x.value),src:"nws"}; } }catch(e){}
+  try{ const j=await cvGet("https://api.open-meteo.com/v1/forecast?latitude="+pl.lat.toFixed(4)+"&longitude="+pl.lon.toFixed(4)+"&current=cloud_cover&timezone=auto"), c=(j.current||{}).cloud_cover; if(typeof c==="number") return {lv:skyLevelPct(c),src:"model"}; }catch(e){}
+  return null; }
+const skyRGB=c=>c[0]==="#"?[1,3,5].map(i=>parseInt(c.slice(i,i+2),16)):c.match(/\d+/g).slice(0,3).map(Number);
+const skyHex=a=>"rgb("+a.map(v=>Math.round(Math.max(0,Math.min(255,v)))).join(",")+")";
+/* sky color for a cloudy level: loses its blue, by day gets lighter gray and a little dimmer, at night gets a faint city glow */
+function skyGray(c,lv,d){ const a=skyRGB(c), m=[0,0.15,0.4,0.7,0.92][lv-1], k=[1,1,0.99,0.96,0.93][lv-1], l=0.3*a[0]+0.59*a[1]+0.11*a[2]+[0,0,6,16,30][lv-1]*d+[0,3,7,16,24][lv-1]*(1-d), g=[l*(0.96-0.04*(1-d)),l*(1-0.01*(1-d)),l*(1.05+0.07*(1-d))];
+  return skyHex(a.map((v,i)=>(v+(g[i]-v)*m)*(1+(k-1)*d))); }
+const skyDim=(c,lv,d)=>skyHex(skyRGB(c).map(v=>v*(1-[0,0,0.05,0.1,0.16][lv-1]*d)));
+const skyCloudRGB=(lv,d)=>[255,255,255].map((v,i)=>(v-[0,5,15,38,66][lv-1])*d+([70,80,108][i]-[0,0,6,16,26][lv-1])*(1-d));
+/* ---- HORIZON MODULE BEGIN ----
+   The ground at the bottom of the sky banner. Three choices: terrain (flat, rolling, mountains), settlement by population (rural, town, city), and how dark it is.
+   The scene is drawn in a fixed 680 by 150 box centered in the card, with sky and ground running far past the edges, so any card width works and nothing is stretched.
+   The shapes are made once per choice and kept; colors are mixed from a day set and a night set every time the banner is drawn, so dusk blends smoothly.
+   Rural: under 5,000 people (a barn and silo). Town: 5,000 to 49,999. City: 50,000 and up. Unknown population: plain farmland, no barn. */
+const HZ_X0=-700, HZ_X1=1400;
+const HZ_PAL={   /* [night, day] */
+  far:["#101d38","#a9c4c4"], hfar:["#0f1b34","#9fb9c6"], hmid:["#0a1426","#759c82"], mfar:["#060c1e","#9db3cc"], mnear:["#0b1527","#6e8d9f"], foot:["#08111f","#5f8a6a"], near:["#060c17","#5f875f"],
+  snow:["#aebddf","#f1f5fc"], cback:["#0e1728","#93a3b6"], cfront:["#070d18","#72849a"], ground:["#08111b","#6c9159"], lo:["#050b13","#4d7647"], road:["#0b121b","#85888c"],
+  walls0:["#0c121b","#b3a99c"], walls1:["#0a1019","#a39a8e"], walls2:["#0e1520","#bdb3a6"], twalls0:["#1b2536","#b3a99c"], twalls1:["#172030","#a39a8e"], twalls2:["#202b3d","#bdb3a6"],
+  roofs0:["#06090f","#7d6a60"], roofs1:["#070b12","#6d737d"], roofs2:["#05080d","#8b6b57"], roofs3:["#05080d","#5f6670"], troof:["#0b111c","#6d737d"],
+  trees0:["#07120f","#4c7a49"], trees1:["#08140f","#5a8a52"], trees2:["#061008","#3f6c40"], tank:["#0b121b","#cfd4d8"], legs:["#070c13","#6a7075"],
+  barn:["#06090f","#85756c"], broof:["#04070c","#6f5f5a"], silo:["#0a0f17","#a2a9aa"],
+  fields0:["#0c1520","#86a862"], fields1:["#0a131d","#7ba058"], fields2:["#09111a","#93ad60"], fields3:["#070e16","#6d9754"], fields4:["#050a11","#5c8a4d"],
+  rows:["#9db4ff","#ffffff"], win:["#ffd27a","#ffd27a"], lamp:["#ffd890","#ffd890"], glow:["#ffb860","#ffb860"], beacon:["#ff6a58","#ff6a58"], beaconglow:["#ff4a3a","#ff4a3a"], farm:["#ffc860","#ffc860"], farm2:["#ffd48a","#ffd48a"], rimn:["#9db4ff","#9db4ff"]
+};
+const hzRgb=h=>[1,3,5].map(i=>parseInt(h.slice(i,i+2),16));
+const HZ_FAR=new Set(["far","hfar","hmid","mfar","mnear","foot","cback"]);
+/* gray (0 to 1) drains the color under cloud; haze {rgb,a} pulls the far layers toward the sky color, so under a heavy overcast the distant ridges fade out instead of staying crisp */
+function hzCol(key,d,dim,o){ const p=HZ_PAL[key], a=hzRgb(p[0]), b=hzRgb(p[1]); let v=a.map((x,i)=>x+(b[i]-x)*d);
+  if(o){ if(o.gray>0){ const l=0.3*v[0]+0.59*v[1]+0.11*v[2]; v=v.map(x=>x+(l-x)*o.gray); }
+    if(o.haze&&o.haze.a>0&&HZ_FAR.has(key)) v=v.map((x,i)=>x+(o.haze.rgb[i]-x)*o.haze.a); }
+  return "rgb("+v.map(x=>Math.round(x*dim)).join(",")+")"; }
+function hzRng(seed){ let s=seed; return ()=>{ s=(s*16807)%2147483647; return s/2147483647; }; }
+const hzU=(r,a,b)=>a+(b-a)*r();
+const hzF=v=>{ const t=(Math.round(v*10)/10).toString(); return t; };
+function hzSmooth(r,terms){ const ph=terms.map(t=>[t[0],t[1],hzU(r,0,6.28)]); return x=>ph.reduce((s,p)=>s+p[0]*Math.sin(x/p[1]+p[2]),0); }
+function hzFractal(r,n,rough){
+  const h=new Array(n+1).fill(0); h[0]=r(); h[n]=r(); let step=n, amp=1;
+  while(step>1){ const half=step>>1; for(let i=half;i<n;i+=step) h[i]=(h[i-half]+h[i+half])/2+hzU(r,-amp,amp); amp*=rough; step=half; }
+  let lo=Infinity, hi=-Infinity; for(const v of h){ if(v<lo) lo=v; if(v>hi) hi=v; } for(let i=0;i<=n;i++) h[i]=(h[i]-lo)/(hi-lo);
+  return x=>{ const t=Math.max(0,Math.min(n-1e-6,(x-HZ_X0)/(HZ_X1-HZ_X0)*n)), i=Math.floor(t), fr=t-i; return h[i]*(1-fr)+h[i+1]*fr; }; }
+function hzTreeTop(r,hmin,hmax,wlo,whi,cf){
+  const trees=[]; let x=HZ_X0-30, mr=whi/2;
+  while(x<HZ_X1+30){ const w=hzU(r,wlo,whi), h=hzU(r,hmin,hmax); trees.push([x+w/2,w/2,h,r()<cf]); x+=w*hzU(r,0.45,0.85); }
+  const ph1=hzU(r,0,6), ph2=hzU(r,0,6); let j=0, last=-1e9;
+  return xs=>{
+    if(xs<last) j=0; last=xs; while(j<trees.length&&trees[j][0]+mr<xs) j++;
+    const mod=Math.max(0.25,0.55+0.45*Math.sin(xs/37+ph1)*Math.sin(xs/91+ph2)); let t=1;
+    for(let k=j;k<trees.length&&trees[k][0]-mr<=xs;k++){ const T=trees[k], dd=Math.abs(xs-T[0]); if(dd>=T[1]) continue;
+      const sh=T[3]?(1-dd/T[1]):Math.sqrt(1-(dd/T[1])*(dd/T[1])), v=T[2]*mod*(T[3]?1.15:1)*sh; if(v>t) t=v; }
+    return t; }; }
+function hzProf(base,top,step){ step=step||2.5; const pts=[]; for(let x=HZ_X0;x<=HZ_X1;x+=step) pts.push([x,base(x)-(top?top(x):0)]); return pts; }
+const hzPoly=(pts,bottom)=>"M"+HZ_X0+" "+bottom+" L"+pts.map(p=>hzF(p[0])+" "+hzF(p[1])).join(" L")+" L"+HZ_X1+" "+bottom+" Z";
+const hzLine=pts=>"M"+pts.map(p=>hzF(p[0])+" "+hzF(p[1])).join(" L");
+const hzClamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const hzTier=pop=>pop==null?"unknown":(pop<5000?"rural":(pop<50000?"town":"city"));
+/* An item is {a:{d:...}|{x,y,width,height}, tag:"path"|"rect"|"ellipse"|"circle", f:color key, op, k, st:stroke key, sw, blur}. k says when it shows: "l" lights (dark only), "n" night only, "s" snow strength. */
+const hzP=(d,f,extra)=>Object.assign({tag:"path",a:{d:d},f:f,op:1},extra||{});
+const hzR=(x,y,w,h,f,extra)=>Object.assign({tag:"rect",a:{x:x,y:y,width:w,height:h},f:f,op:1},extra||{});
+
+function hzBack(terrain,cx,it){
+  const r=hzRng(11);
+  if(terrain==="flat"){ it.push(hzP(hzPoly(hzProf(()=>111.5,hzTreeTop(r,3,8.5,3,7,0.2)),150),"far")); }
+  else if(terrain==="rolling"){
+    const n1=hzSmooth(r,[[13,170],[6,71],[2.5,31]]), n2=hzSmooth(r,[[9,130],[5,58],[2,26]]);
+    it.push(hzP(hzPoly(hzProf(x=>94+n1(x),hzTreeTop(r,1.5,4.5,2.5,6,0.2)),150),"hfar"));
+    it.push(hzP(hzPoly(hzProf(x=>104+n2(x),hzTreeTop(r,2,6,3,8,0.25)),150),"hmid")); }
+  else {
+    const r1=hzFractal(r,1024,0.74), r2=hzFractal(r,512,0.7), d1=x=>0.55+0.45*Math.min(1,Math.abs(x-cx)/110), d2=x=>0.7+0.3*Math.min(1,Math.abs(x-cx)/110);
+    const far=hzProf(x=>113-(8+58*Math.pow(r1(x),1.7))*d1(x));
+    it.push(hzP(hzPoly(far,150),"mfar"));
+    it.push(hzP(hzLine(far),null,{st:"rimn",sw:0.9,op:0.38,k:"n"}));
+    const sl=x=>82+3*Math.sin(x/23)+2*Math.sin(x/9), bot=far.map(p=>[p[0],Math.max(p[1],sl(p[0]))]);
+    it.push(hzP("M"+far.map(p=>hzF(p[0])+" "+hzF(p[1])).join(" L")+" L"+bot.slice().reverse().map(p=>hzF(p[0])+" "+hzF(p[1])).join(" L")+" Z","snow",{k:"s"}));
+    it.push(hzP(hzPoly(hzProf(x=>114-(5+30*Math.pow(r2(x),1.5))*d2(x),hzTreeTop(r,1,3,2,5,0.7)),150),"mnear"));
+    const n3=hzSmooth(r,[[3,90],[1.5,40]]);
+    it.push(hzP(hzPoly(hzProf(x=>111+n3(x),hzTreeTop(r,2,6,3,7,0.5)),150),"foot")); } }
+
+function hzBarn(it){
+  const sx=x=>hzF(520+(x-590)*1.6), sy=y=>hzF(116+(y-116)*1.6);   /* barn and silo, drawn 1.6 times larger around (590,116), then moved left to x 520 so a phone sees it */
+  it.push(hzR(520+(585-590)*1.6,116+(110.2-116)*1.6,17.6,9.28,"barn"));
+  it.push(hzP("M"+sx(584)+" "+sy(110.4)+"L"+sx(590.5)+" "+sy(106.2)+"L"+sx(597)+" "+sy(110.4)+"Z","broof"));
+  it.push(hzR(520+(598.4-590)*1.6,116+(104.8-116)*1.6,5.28,17.6,"silo"));
+  it.push({tag:"circle",a:{cx:520+(600-590)*1.6,cy:116+(104.9-116)*1.6,r:2.64},f:"silo",op:1});
+  it.push({tag:"circle",a:{cx:518.3,cy:113.4,r:0.8},f:"farm",op:1,k:"l"});
+  it.push({tag:"circle",a:{cx:518.3,cy:113.4,r:3.5},f:"farm",op:0.18,k:"l"});
+  it.push({tag:"circle",a:{cx:132,cy:114.4,r:0.8},f:"farm2",op:0.85,k:"l"});
+  it.push({tag:"circle",a:{cx:132,cy:114.4,r:3},f:"farm2",op:0.14,k:"l"}); }
+
+function hzCity(pop,it){
+  const r=hzRng(3), cx=362, s=hzClamp((Math.log10(pop)-4.7)/1.8,0,1), hmax=32+30*s, span=120+250*s, win=[];
+  it.push({tag:"ellipse",a:{cx:cx,cy:114,rx:hzF(span*0.6),ry:hzF(10+14*s)},f:"glow",op:0.11,k:"l",blur:1});
+  const sk=[]; let xx=cx-span*0.66;
+  while(xx<cx+span*0.66){ const w=hzU(r,6,12), u=Math.min(1,Math.abs(xx-cx)/(span*0.66)), h=Math.max(4,hmax*(0.22*(1-u*u)+0.05)*hzU(r,0.7,1.1));
+    sk.push("M"+hzF(xx)+" "+hzF(117-h)+"h"+hzF(w+1)+"v"+hzF(h+1)+"h-"+hzF(w+1)+"z"); xx+=w*0.9; }
+  it.push(hzP(sk.join(""),"cback"));
+  for(let layer=0;layer<2;layer++){
+    let x=cx-span/2+(layer?4:0); const body=[];
+    while(x<cx+span/2){ const w=hzU(r,5,13);
+      if(r()<Math.max(0,0.2-s*0.6)){ x+=w; continue; }
+      const u=Math.abs(x-cx)/(span/2), tp=u<0.72?1:Math.max(0.14,1-Math.pow((u-0.72)/0.28,1.2)), e=(0.34+0.66*Math.exp(-Math.pow((x-cx)/(span*0.38),2)))*tp;
+      let h=hmax*e*hzU(r,0.4,1)*(layer?1:1.12); if(u<0.5&&r()<0.14) h*=1.35; h=Math.max(5,Math.min(h,68));
+      const top=117-h; body.push("M"+hzF(x)+" "+hzF(top)+"h"+hzF(w)+"v"+hzF(h)+"h-"+hzF(w)+"z");
+      const q=r();
+      if(q<0.25) body.push("M"+hzF(x+w*0.2)+" "+hzF(top-h*0.12)+"h"+hzF(w*0.6)+"v"+hzF(h*0.12+0.5)+"h-"+hzF(w*0.6)+"z");
+      else if(q<0.45) body.push("M"+hzF(x+w/2-0.4)+" "+hzF(top-hzU(r,5,12))+"h0.8v12h-0.8z");
+      else if(q<0.6) body.push("M"+hzF(x+w*0.2)+" "+hzF(top)+"L"+hzF(x+w/2)+" "+hzF(top-8)+"L"+hzF(x+w*0.8)+" "+hzF(top)+"z");
+      if(layer===1){ for(let wx=x+1.2;wx<x+w-1.5;wx+=3) for(let wy=top+2.5;wy<114;wy+=4.2) if(r()<0.28) win.push("M"+hzF(wx)+" "+hzF(wy)+"h1.2v1.5h-1.2z"); }
+      x+=w*hzU(r,0.6,1); }
+    it.push(hzP(body.join(""),layer?"cfront":"cback")); }
+  it.push(hzP(win.join(""),"win",{op:0.75,k:"l"})); }
+
+function hzTown(it){
+  const r=hzRng(8), cx=320, win=[];
+  it.push({tag:"ellipse",a:{cx:cx+10,cy:113,rx:85,ry:13},f:"glow",op:0.16,k:"l",blur:1});
+  for(let x=cx-38;x<cx+38;){ const w=hzU(r,7,12), h=hzU(r,6,12);
+    it.push(hzR(hzF(x),hzF(117-h),hzF(w),hzF(h),"twalls"+Math.floor(r()*3)));
+    it.push(hzR(hzF(x),hzF(117-h-1),hzF(w),1.2,"troof"));
+    for(let k=0;k<Math.floor(w/3.2);k++) for(let rr=0;rr<Math.floor(h/3.6);rr++) if(r()<0.6) win.push("M"+hzF(x+1.3+k*3.2)+" "+hzF(117-h+2.2+rr*3.6)+"h1.3v1.7h-1.3z");
+    x+=w+hzU(r,0,1.5); }
+  const sx=cx+46;
+  it.push(hzR(sx,104,8,13,"twalls0"));
+  it.push(hzP("M"+hzF(sx-0.5)+" 104L"+hzF(sx+4)+" 92L"+hzF(sx+8.5)+" 104z","roofs1"));
+  win.push("M"+hzF(sx+3.2)+" 107h1.6v2.6h-1.6z");
+  const wx=cx-78;
+  it.push(hzP("M"+hzF(wx-4)+" 117L"+hzF(wx-2)+" 106M"+hzF(wx+4)+" 117L"+hzF(wx+2)+" 106",null,{st:"legs",sw:1.4}));
+  it.push({tag:"ellipse",a:{cx:wx,cy:103.5,rx:6,ry:4.5},f:"tank",op:1});
+  it.push(hzP("M"+hzF(wx-4)+" 100L"+hzF(wx)+" 96L"+hzF(wx+4)+" 100z","tank"));
+  it.push({tag:"circle",a:{cx:wx,cy:95.4,r:3.2},f:"beaconglow",op:0.25,k:"l"});
+  it.push({tag:"circle",a:{cx:wx,cy:95.4,r:0.9},f:"beacon",op:1,k:"l"});
+  it.push(hzP(win.join(""),"win",{op:0.85,k:"l"})); }
+
+function hzSprawl(pop,ti,it){
+  const r=hzRng(41), t=hzClamp((Math.log10(Math.max(pop,1))-3.7)/2.8,0,1), hf=0.12+0.8*t, XL=HZ_X0, XR=HZ_X1;
+  it.push(hzR(HZ_X0,115.6,HZ_X1-HZ_X0,36,"ground"));
+  [[121,1],[128.5,1.5]].forEach(row=>{
+    const base=row[0], sc=row[1], groups={}, wins=[], lamps=[], G=(k,s)=>(groups[k]=groups[k]||[]).push(s);
+    for(let x=XL+hzU(r,0,6);x<XR;){ const q=r();
+      if(q<hf){ const w=hzU(r,3.8,6.5)*sc, h=hzU(r,2,3)*sc, rh=h*0.95, wall="walls"+Math.floor(r()*3), roof="roofs"+Math.floor(r()*4);
+        G(wall,"M"+hzF(x)+" "+hzF(base)+"h"+hzF(w)+"v-"+hzF(h)+"h-"+hzF(w)+"z");
+        G(roof,"M"+hzF(x-0.4*sc)+" "+hzF(base-h)+"l"+hzF(w/2+0.4*sc)+" -"+hzF(rh)+"l"+hzF(w/2+0.4*sc)+" "+hzF(rh)+"z");
+        if(r()<(ti==="town"?0.07:0.3)) wins.push("M"+hzF(x+w*0.3)+" "+hzF(base-h*0.75)+"h"+hzF(0.9*sc)+"v"+hzF(sc)+"h-"+hzF(0.9*sc)+"z");
+        x+=w*hzU(r,1.35,2.4); }
+      else if(q<hf+(1-hf)*0.85){ const rr=hzU(r,2.2,4.2)*sc, col="trees"+Math.floor(r()*3), cy=base-rr*0.8;
+        G(col,"M"+hzF(x)+" "+hzF(cy)+"a"+hzF(rr)+" "+hzF(rr*0.95)+" 0 1 0 "+hzF(2*rr)+" 0a"+hzF(rr)+" "+hzF(rr*0.95)+" 0 1 0 -"+hzF(2*rr)+" 0z");
+        x+=rr*hzU(r,1.4,2); }
+      else x+=hzU(r,3,9)*sc; }
+    it.push(hzR(HZ_X0,hzF(base+0.4),HZ_X1-HZ_X0,hzF(1.1*sc),"road"));
+    Object.keys(groups).forEach(k=>it.push(hzP(groups[k].join(""),k)));
+    it.push(hzP(wins.join(""),"win",{op:0.8,k:"l"}));
+    for(let lx=XL+hzU(r,0,14*sc);lx<XR;lx+=(ti==="town"?40:16)*sc) lamps.push("M"+hzF(lx)+" "+hzF(base+0.7)+"m-"+hzF(0.6*sc)+" 0a"+hzF(0.6*sc)+" "+hzF(0.6*sc)+" 0 1 0 "+hzF(1.2*sc)+" 0a"+hzF(0.6*sc)+" "+hzF(0.6*sc)+" 0 1 0 -"+hzF(1.2*sc)+" 0z");
+    it.push(hzP(lamps.join(""),"lamp",{k:"l"})); });
+  it.push(hzR(HZ_X0,133,HZ_X1-HZ_X0,19,"lo",{op:0.85}));
+  it.push(hzR(HZ_X0,139,HZ_X1-HZ_X0,2.4,"road"));
+  const ls=[]; for(let lx=XL+7;lx<XR;lx+=(ti==="town"?80:34)) ls.push("M"+hzF(lx)+" 139.6m-1.2 0a1.2 1.2 0 1 0 2.4 0a1.2 1.2 0 1 0 -2.4 0z");
+  it.push(hzP(ls.join(""),"lamp",{k:"l"})); }
+
+function hzFront(terrain,it){
+  const r=hzRng(23), pts=hzProf(()=>115.8,hzTreeTop(r,7,19,5,12,terrain==="mountains"?0.65:0.3)), ys=[115.6,118.6,122.4,127.6,135,150];
+  it.push(hzP(hzPoly(pts,119),"near"));
+  it.push(hzP(hzLine(pts),null,{st:"RIM",sw:0.8,op:0.6}));
+  for(let i=0;i<5;i++) it.push(hzP("M"+HZ_X0+" "+hzF(ys[i]+(i%2?0.3:-0.2))+"L"+HZ_X1+" "+hzF(ys[i]-(i%2?0.4:0.1))+"L"+HZ_X1+" "+hzF(ys[i+1]+1)+"L"+HZ_X0+" "+hzF(ys[i+1]+1)+"z","fields"+i));
+  let rows="M362 116.5"; for(let xb=-380;xb<1110;xb+=22) rows+="L"+xb+" 150M362 116.5";
+  it.push(hzP(rows,null,{st:"rows",sw:0.7,op:"ROWS"}));
+  it.push(hzR(HZ_X0,114,HZ_X1-HZ_X0,22,"FZ")); }
+
+const HZ_CACHE=new Map();
+function hzGeo(terrain,pop,cx){
+  const ti=hzTier(pop), key=terrain+"|"+ti+"|"+(ti==="city"||ti==="town"?Math.round(Math.log10(pop)*10):0)+"|"+(terrain==="mountains"?Math.round(cx/25):0);
+  let g=HZ_CACHE.get(key); if(g) return g;
+  const it=[]; hzBack(terrain,cx,it);
+  if(ti==="rural") hzBarn(it);
+  else if(ti==="town") hzTown(it);
+  else if(ti==="city") hzCity(pop,it);
+  if(ti==="town"||ti==="city") hzSprawl(pop,ti,it); else hzFront(terrain,it);
+  if(HZ_CACHE.size>=8) HZ_CACHE.clear();
+  HZ_CACHE.set(key,it); return it; }
+
+/* Draws the ground into svg. o: {terrain, pop, d (0 night to 1 day), lv (cloud level 0 to 5), cx (x of the sun or moon in the 680 box), rim (0 to 1, how much light on the ridge edge)} */
+function skyHorizon(svg,mk,uid,W,o){
+  const d=o.d, dim=o.lv>=1?1-[0,0,0.06,0.14,0.22][o.lv-1]*d:1, co=o.lv>=1?{gray:[0,0,0.12,0.3,0.5][o.lv-1]*d,haze:o.sky?{rgb:o.sky,a:[0,0,0,0.3,0.5][o.lv-1]}:null}:null, L=hzClamp((0.55-d)/0.3,0,1), g=mk(svg,"g",{transform:"translate("+hzF((W-680)/2)+" 0)"});
+  const df=mk(g,"defs",{}), flt=mk(df,"filter",{id:uid+"hb",filterUnits:"userSpaceOnUse",x:-900,y:-100,width:2600,height:400}); mk(flt,"feGaussianBlur",{stdDeviation:8});
+  const pk=hzClamp((o.cx-HZ_X0)/(HZ_X1-HZ_X0),0.12,0.88), rg=mk(df,"linearGradient",{id:uid+"rim",gradientUnits:"userSpaceOnUse",x1:HZ_X0,y1:0,x2:HZ_X1,y2:0}), rc=hzCol(d>0.5?"rows":"rimn",1,1);
+  const rcol=o.tw>0.1?"rgb(255,170,100)":(d>0.5?"rgb(255,246,208)":"rgb(184,201,255)"), rpk=(0.55+0.2*d)*o.rim;
+  [[0,0],[pk-0.11,0],[pk,rpk],[pk+0.11,0],[1,0]].forEach(s=>mk(rg,"stop",{offset:hzF(s[0]*100)/100,"stop-color":rcol,"stop-opacity":s[1]}));
+  const zg=mk(df,"linearGradient",{id:uid+"fz",x1:0,y1:0,x2:0,y2:1}), zc=d>0.5?"rgb(255,246,220)":"rgb(90,111,166)", zo=0.22+0.1*d;
+  mk(zg,"stop",{offset:0,"stop-color":zc,"stop-opacity":zo}); mk(zg,"stop",{offset:1,"stop-color":zc,"stop-opacity":0});
+  hzGeo(o.terrain,o.pop,o.cx).forEach(i=>{
+    let op=i.op; if(i.f==="rows"||i.st==="rows") op=0;
+    if(i.k==="l") op*=L; else if(i.k==="n") op*=(1-d)*[1,1,0.7,0.3,0][o.lv>0?o.lv-1:0]; else if(i.k==="s") op=(0.45+0.55*d)*(o.lv>=4&&d<0.5?[1,1,1,0.35,0.15][o.lv-1]:1);
+    if(i.op==="ROWS") op=0.05+0.04*d;
+    if(op<=0.005) return;
+    const a=Object.assign({},i.a); let tag=i.tag;
+    if(i.f==="FZ"){ a.fill="url(#"+uid+"fz)"; }
+    else if(i.f) a.fill=hzCol(i.f,d,dim,co); else a.fill="none";
+    if(i.st==="RIM") a.stroke="url(#"+uid+"rim)"; else if(i.st==="rows") a.stroke=hzCol("rows",d,1); else if(i.st) { a.stroke=hzCol(i.st,d,i.st==="rimn"?1:dim,i.st==="rimn"?null:co); }
+    if(i.sw) a["stroke-width"]=i.sw;
+    if(op<1) a.opacity=op;
+    if(i.blur) a.filter="url(#"+uid+"hb)";
+    mk(g,tag,a); });
+  if(o.tw>0.02){ const wg=mk(df,"linearGradient",{id:uid+"wm",x1:0,y1:0,x2:0,y2:1}); mk(wg,"stop",{offset:0,"stop-color":"rgb(255,140,70)","stop-opacity":0}); mk(wg,"stop",{offset:1,"stop-color":"rgb(255,140,70)","stop-opacity":0.2*o.tw});
+    mk(g,"rect",{x:HZ_X0,y:90,width:HZ_X1-HZ_X0,height:62,fill:"url(#"+uid+"wm)"}); } }
+/* ---- HORIZON MODULE END ---- */
+let SKYB_N=0;
+function skyBanner(name,words,lat,lon,ms,lv,tag,hz){
+  lv=(lv>=1&&lv<=5)?lv:0;
+  const q=skyPos(ms,lat,lon), sa=q.sun.alt, H=150, HZ=118, NS="http://www.w3.org/2000/svg", uid="skb"+(++SKYB_N), d=Math.max(0,Math.min(1,(sa+6)/14)), cov=lv?SKY_COV[lv-1]:0;
+  if(!words&&lv) words=skyWords(lv,sa)+(tag?" ("+tag+")":"");
+  const mk=(p,t,a)=>{ const e=document.createElementNS(NS,t); for(const k in a) e.setAttribute(k,a[k]); p.appendChild(e); return e; };
+  const wrap=el("div","skyb"), svg=document.createElementNS(NS,"svg"); svg.setAttribute("class","skysvg"); svg.setAttribute("aria-hidden","true");
+  wrap._fill=function(W){
+    wrap._w=W; svg.replaceChildren(); svg.setAttribute("viewBox","0 0 "+W+" "+H);
+    let seed=7; const rn=()=>{ seed=(seed*16807)%2147483647; return seed/2147483647; }, f=W/680;
+    const X=az=>Math.max(30,Math.min(W-30,W*(0.08+0.84*(az-90)/180))), Y=alt=>{ const t=Math.min(1,Math.max(0,alt)/60); return HZ-(HZ-34)*(1-Math.pow(1-t,1.6)); }, BASE=72;
+    const skyC=skyRamp(sa,SKYB_SKY), grC=skyRamp(sa,SKYB_GR);
+    const tw=Math.max(0,1-Math.abs(sa-1)/9), sk=c=>lv?skyGray(c,lv,d):c, tcol=sk(skyC), hcol=sk(skyRamp(sa,SKYB_HZN)), tA=skyRGB(tcol), hA=skyRGB(hcol), mcol=skyHex(tA.map((v,i)=>v+(hA[i]-v)*0.3));
+    const sg=mk(mk(svg,"defs",{}),"linearGradient",{id:uid+"sk",x1:0,y1:0,x2:0,y2:1}); [[0,tcol],[0.5,mcol],[0.787,hcol],[1,hcol]].forEach(a=>mk(sg,"stop",{offset:a[0],"stop-color":a[1]}));
+    mk(svg,"rect",{x:0,y:0,width:W,height:H,fill:"url(#"+uid+"sk)"});
+    const wm=Math.max(0,Math.min(1,1-sa/12)), sunFill=skyHex([255,216,74].map((v,i)=>v+([255,132,48][i]-v)*wm*0.9)), rayFill=skyHex([255,226,122].map((v,i)=>v+([255,160,80][i]-v)*wm*0.9));
+    const df=mk(svg,"defs",{});
+    if(tw>0.02&&sa>-8){ const gk=tw*(lv?[1,0.95,0.85,0.55,0.3][lv-1]:1), c0=sa>=0?[255,178,90]:[255,178,90].map((v,i)=>v+([230,100,130][i]-v)*Math.min(1,-sa/5)), rg=mk(df,"radialGradient",{id:uid+"gl",cx:0.5,cy:0.5,r:0.5});
+      mk(rg,"stop",{offset:"0%","stop-color":skyHex(c0),"stop-opacity":0.95}); mk(rg,"stop",{offset:"45%","stop-color":skyHex(c0.map((v,i)=>v+([255,110,70][i]-v)*0.4)),"stop-opacity":0.35}); mk(rg,"stop",{offset:"100%","stop-color":skyHex(c0),"stop-opacity":0});
+      mk(svg,"ellipse",{cx:X(q.sun.az),cy:HZ,rx:Math.max(230,W*0.36),ry:100,fill:"url(#"+uid+"gl)",opacity:Math.min(1,gk)}); } [["s","#fff3c0"],["m","#dfe8ff"]].forEach(a=>{ const g=mk(df,"radialGradient",{id:uid+a[0]}); mk(g,"stop",{offset:"0%","stop-color":a[1],"stop-opacity":1}); mk(g,"stop",{offset:"100%","stop-color":a[1],"stop-opacity":0}); });
+    const so=Math.max(0,Math.min(1,(-sa-3)/9));
+    if(so>0){ const g=mk(svg,"g",{class:"skystars",opacity:so});
+      for(let i=0,n=Math.round(W/8.5);i<n;i++){ const cx=rn()*W, cy=rn()*(HZ-8), r=0.6+rn()*1.3, dl=-rn()*3; if((i*0.618034)%1<cov) continue; mk(g,"circle",{cx:cx,cy:cy,r:r,fill:"#fff",class:"sktw",style:"animation-delay:"+dl+"s"}); }
+      [[[70,34],[120,46],[150,70],[190,58],[210,30]],[[330,26],[372,38],[352,64],[398,70]],[[500,52],[540,36],[590,58],[618,30]]].forEach((c,ci)=>{ if(lv>3||(lv===3&&ci>0)) return; c.forEach((p,i)=>{ if(i) mk(g,"line",{x1:c[i-1][0]*f,y1:c[i-1][1],x2:p[0]*f,y2:p[1],stroke:"#3b4a78","stroke-width":1}); }); c.forEach(p=>mk(g,"circle",{cx:p[0]*f,cy:p[1],r:2,fill:"#fff"})); }); }
+    const tt=y=>Math.max(0,Math.min(1,(y-(BASE-6))/20));   /* 0 = up in the cloud band, 1 = low enough to sit under the cloud base */
+    if(sa>-2){ const sy=Y(sa), t=tt(sy), g=mk(svg,"g",{class:"skysun",transform:"translate("+X(q.sun.az)+","+sy+")"});
+      if(lv>=4){ const go=lv===4?(1-t)*0.7:0.38*(0.4+0.6*d); if(go>0.02) mk(g,"circle",{cx:0,cy:0,r:lv===4?66:80,fill:"url(#"+uid+"s)",opacity:go*(lv===4?(0.4+0.6*d):1)}); }
+      const dop=lv>=5?0:(lv===4?0.85*t:1), rayK=Math.max(0,Math.min(1,sa/8));
+      if(dop>0.02){ const rg=mk(g,"g",{class:"skrot",opacity:dop});
+        for(let i=0;i<12;i++){ const a=i*Math.PI/6; mk(rg,"line",{x1:Math.cos(a)*30,y1:Math.sin(a)*30,x2:Math.cos(a)*52,y2:Math.sin(a)*52,stroke:rayFill,"stroke-width":3,opacity:(lv>=3?0.3:0.45)*rayK}); }
+        mk(g,"circle",{cx:0,cy:0,r:22,fill:sunFill,opacity:dop}); } }
+    if(q.moon.alt>0&&sa<-3&&q.moon.lit>0.02){ const g=mk(svg,"g",{class:"skymoon",opacity:Math.min(1,(-sa-3)/4)}), mx=X(q.moon.az), my=Y(q.moon.alt), t=tt(my), mo=lv>=5?0:(lv===4?0.85*t:1);
+      if(lv>=4){ const go=(lv===4?(1-t)*0.5:0.25)*(0.35+0.65*q.moon.lit); if(go>0.02) mk(g,"circle",{cx:mx,cy:my,r:lv===4?40:52,fill:"url(#"+uid+"m)",opacity:go}); }
+      if(mo>0.02) mk(g,"path",{d:skyMoonPath(mx,my,15,q.moon.phase),fill:"#f1ede0",opacity:mo}); }
+    if(lv){                                                   /* clouds drift right to left, wrap around, and sit in front of the sun and moon. Soft puffs lit from above with a shaded flat bottom; few and scattered clouds also get thin wisps, heavy cover gets wide low banks */
+      const sc=Math.max(0.62,Math.min(1.4,W/680)), cw0=[60,90,120,160,200][lv-1]*sc, ch0=cw0*0.34, n=lv===1?1:Math.max(2,Math.round(-Math.log(1-[0,0.25,0.5,0.75,0.985][lv-1])*W*BASE*SKY_K[lv-1]/(cw0*ch0))),
+        cc0=skyCloudRGB(lv,d), tk=tw*[1,1,0.9,0.6,0.3][lv-1]*0.5, tgt=sa>=0?[255,172,122]:[255,172,122].map((v,i)=>v+([205,115,148][i]-v)*Math.min(1,-sa/5)), cc=cc0.map((v,i)=>v+(tgt[i]-v)*tk),
+        under=skyHex(cc.map(v=>v*0.8)), op=[0.8,0.92,0.95,0.95,0.6][lv-1], asp=[1.05,1.1,1.3,1.6,1.9][lv-1], np=lv<=2?5:(lv===3?7:9);
+      const tiers=(tw>0.05?[0,1,2]:[0]).map(ti=>{ const f=tw>0.05?[0.55,1,1.35][ti]:1, tg2=(ti===0&&tw>0.05)?tgt.map((v,i)=>v+([170,125,175][i]-v)*0.45):tgt, c2=cc0.map((v,i)=>v+(tg2[i]-v)*Math.min(0.85,tk*f)), und=skyHex(c2.map(v=>v*0.8)),
+          cg=mk(df,"radialGradient",{id:uid+"c"+ti,cx:0.42,cy:0.34,r:0.68});
+        [[0,skyHex(c2.map(v=>Math.min(255,v*1.04+8))),1],[0.5,skyHex(c2),1],[0.85,und,0.85],[1,und,0]].forEach(a=>mk(cg,"stop",{offset:a[0],"stop-color":a[1],"stop-opacity":a[2]}));
+        const bg=mk(df,"radialGradient",{id:uid+"b"+ti,cx:0.5,cy:0.4,r:0.55}); mk(bg,"stop",{offset:0,"stop-color":und,"stop-opacity":0.9}); mk(bg,"stop",{offset:1,"stop-color":und,"stop-opacity":0}); return {und:und,ti:ti}; }),
+        tierOf=y=>tiers.length===1?tiers[0]:(y<20?tiers[0]:(y<34?tiers[1]:tiers[2]));
+      const wg=mk(df,"radialGradient",{id:uid+"w",cx:0.5,cy:0.5,r:0.5}); mk(wg,"stop",{offset:0,"stop-color":skyHex(cc.map(v=>Math.min(255,v*1.04+8))),"stop-opacity":0.6}); mk(wg,"stop",{offset:1,"stop-color":skyHex(cc),"stop-opacity":0});
+      const drift=(cw,x0,y,v,o2,build)=>{ const D=W+2*cw, o=mk(svg,"g",{transform:"translate("+(W+cw).toFixed(1)+","+y.toFixed(1)+")",opacity:o2}),
+          a=mk(o,"g",{class:"skcl",style:"--d:-"+D.toFixed(0)+"px;animation:skdrift "+(D/v).toFixed(1)+"s linear infinite;animation-delay:-"+(Math.max(0,W+cw-x0)/v).toFixed(1)+"s"}); build(a); };
+      for(let i=0;i<n;i++){
+        const cw=cw0*(0.8+rn()*0.45), h=cw*0.34, step=(W+cw0)/n, v=4+rn()*4,
+          x0=lv===1?W*0.62:Math.max(-cw*0.5,Math.min(W+cw*0.5,(i+0.5)*step-cw0/2+(rn()-0.5)*step*0.6)), y=lv===1?24:[0,16,14,11,9][lv-1]+[0,30,34,32,32][lv-1]*((i*0.381966+0.17)%1);
+        const tr=tierOf(y);
+        drift(cw,x0,y,v,op,a=>{
+          mk(a,"ellipse",{cx:0,cy:h*0.3,rx:cw*0.52,ry:h*0.2,fill:"url(#"+uid+"b"+tr.ti+")"});
+          const pf=[]; for(let k=0;k<np;k++){ const t=(k+0.5)/np, bl=1-Math.pow(2*t-1,2)*0.75, r=h*(0.26+0.2*bl)*(0.85+rn()*0.3); pf.push([(t-0.5)*cw*0.92+(rn()-0.5)*cw*0.06,h*0.2-bl*h*0.38+(rn()-0.5)*h*0.1,r]); }
+          if(lv<=3) for(let k=0;k<2;k++){ const b=pf[1+Math.floor(rn()*(np-2))]; pf.push([b[0]+(rn()-0.5)*cw*0.1,b[1]-b[2]*0.65,b[2]*0.62]); }
+          pf.sort((p1,p2)=>p2[1]-p1[1]).forEach(p=>mk(a,"ellipse",{cx:p[0].toFixed(1),cy:p[1].toFixed(1),rx:(p[2]*asp).toFixed(1),ry:p[2].toFixed(1),fill:"url(#"+uid+"c"+tr.ti+")"}));
+          mk(a,"ellipse",{cx:0,cy:h*0.32,rx:cw*0.46,ry:h*0.08,fill:tr.und,opacity:0.45}); }); }
+      if(lv<=3){ const nw=lv===3?2:(lv===2?3:2);
+        for(let i=0;i<nw;i++){ const cw=cw0*(1.3+rn()*0.8), x0=rn()*W, y=6+rn()*34, v=3+rn()*2, rot=-6+rn()*12, h=cw*0.34;
+          drift(cw,x0,y,v,0.8,a=>{ mk(a,"ellipse",{cx:0,cy:0,rx:cw*0.5,ry:h*0.09,fill:"url(#"+uid+"w)",transform:"rotate("+rot.toFixed(1)+")"}); mk(a,"ellipse",{cx:cw*0.18,cy:h*0.07,rx:cw*0.3,ry:h*0.06,fill:"url(#"+uid+"w)",transform:"rotate("+rot.toFixed(1)+")"}); }); } } }
+    { const mAlt=q.moon.alt>0&&sa<-3&&q.moon.lit>0.02, bx=sa>-2?X(q.sun.az):(mAlt?X(q.moon.az):340+(W-680)/2),
+        rim=lv>=5?0:(sa>-2?Math.max(0,1-Math.max(0,sa)/30)*(lv>=4?0.4:1):(mAlt?(0.3+0.7*q.moon.lit)*Math.max(0,1-q.moon.alt/30)*(lv>=4?0.4:1):0));
+      skyHorizon(svg,mk,uid,W,{terrain:(hz&&hz.terrain)||"flat",pop:hz?hz.pop:null,d:d,lv:lv,tw:(sa>-6&&sa<12)?tw*(lv?[1,1,0.9,0.5,0.25][lv-1]:1):0,sky:skyRGB(lv?skyGray(skyC,lv,d):skyC),cx:bx-(W-680)/2,rim:rim}); }
+  };
+  wrap._fill(680);
+  wrap.appendChild(svg); wrap.appendChild(el("div","skyn",name)); wrap.appendChild(el("div","skyw",words||"")); return wrap; }
+/* Rain and wind effects for a custom place. There is no rain gauge, so rain comes from the weather words (station text, else the first hour of the forecast, else the model). "Chance of" does not count. Wind uses the station-page rules. A reading more than 60 minutes old turns everything off. */
+function cvFxFor(r){
+  const late=r.kind==="stations"&&r.age>60, txt=r.txt||"", wet=/rain|drizzle|shower|thunder|storm/i.test(txt)&&!/chance/i.test(txt);
+  return {rain:!late&&wet, t:/heavy/i.test(txt)?0.8:(/light|drizzle|slight|isolated/i.test(txt)?0.3:0.5), ws:late?0:(+r.w||0), wg:late?0:(+r.g||0)};
+}
+function customView(){
+  const wrap=el("div");
+  if(state.station==="current"){ wrap.appendChild(section("Current location",el("div","note","Using your location comes in a later step."))); return wrap; }
+  CV_CUR=null;
+  let skyCur=null;
+  let fxCur=null; function fxDrop(){ if(!fxCur) return; const i=FX_LIST.indexOf(fxCur); if(i>=0) FX_LIST.splice(i,1); if(FX_IO) FX_IO.unobserve(fxCur.c); if(FX_RO) FX_RO.unobserve(fxCur.c); fxCur=null; }
+  let curTz=null,curPl=null,last=null,lastAt=0,condSeq=0,tryAt=0,alerts=null,alertsAt=0,alertsErr=false,alSeq=0,alTry=0,alSig=null,extras=null,exAt=0,fc=null,fcAt=0,fcTry=0,fcSeq=0,fcErr=false,fcHour=-1,shapesSt={checked:null,shapes:{},err:false},shSeq=0,shTry=0,sum=null,sumAt=0,sumErr=false,sumSeq=0;
+  const alBox=el("div","cvalbox"), alOpen=new Set();
+  const condBox=el("div"), fcBox=el("div"), radarBox=el("div"), sumBox=el("div");
+  const form=el("form","cvform"); form.setAttribute("autocomplete","off");
+  const inp=el("input"); inp.type="text"; inp.id="cvQ"; inp.placeholder="Address, city and state, zip, airport code, or landmark"; inp.setAttribute("aria-label","Place to look up"); inp.setAttribute("autocapitalize","off"); inp.setAttribute("autocorrect","off"); inp.setAttribute("spellcheck","false");
+  const btn=el("button","act","Look up"); btn.type="submit";
+  const out=el("div","cvout");
+  const note=(t,cls)=>{ const d=el("div",cls||"note",t); d.setAttribute("role","status"); return d; };
+  const show=node=>{ radarDestroy(); out.replaceChildren(node); };
+  const fail=(t,tok)=>{ if(tok===CV_SEQ.n) show(note(t,"note cvmsg err")); };
+  const GENERIC="Couldn't reach the lookup service. Check your connection and try again.";
+  function showPlace(pl){
+    curTz=pl.tz; CV_CUR=pl; const c=card();
+    c.appendChild(el("div","cvtitle",pl.title));
+    const tl=el("div","cvtime","Local time: "); const ts=el("span","cvtimeval",cvTime(pl.tz)); tl.appendChild(ts); c.appendChild(tl);
+    if(pl.pick.label.toLowerCase()!==pl.title.toLowerCase()) c.appendChild(el("div","note","Found as: "+pl.pick.label));
+    c.appendChild(el("div","note","Forecast area: National Weather Service grid "+pl.grid+", a square about 1.5 miles wide."));
+    if(pl.pick.src==="osm") c.appendChild(el("div","note","Place data from OpenStreetMap contributors."));
+    const both=el("div"); both.appendChild(c); both.appendChild(alBox); both.appendChild(condBox); both.appendChild(fcBox); both.appendChild(radarBox); both.appendChild(sumBox); show(both);
+    curPl=pl; last=null; fxDrop(); condBox.replaceChildren(note("Getting current conditions...")); loadCond(pl);
+    extras=null; exAt=0; alerts=null; alertsErr=false; alSig=null; alOpen.clear(); alBox.replaceChildren(note("Checking for alerts...")); loadAlerts(pl);
+    fc=null; fcAt=0; fcErr=false; fcHour=-1; fcBox.replaceChildren(note("Getting the forecast...")); loadFc(pl);
+    sum=null; sumAt=0; sumErr=false; sumBox.replaceChildren();
+    shapesSt={checked:null,shapes:{},err:false}; shTry=0; radarBox.replaceChildren(radarSection({id:"__cv",tz:pl.tz,lat:pl.lat,lon:pl.lon,label:pl.title},()=>shapesSt)); loadShapes(pl);
+  }
+  function cvTile(cs,k,v,sm,off,sm2,noGauge){
+    const t=el("div","tile cvt"); t.style.setProperty("--c","var(--mute)");
+    t.appendChild(el("span",null,METRIC_LABEL[k])); t.appendChild(noGauge?gzSvg(METRIC_LABEL[k]):gaugeFor(cs,k)); t.appendChild(el("b",null,v)); t.appendChild(el("small",null,sm||""));
+    if(sm2) t.appendChild(el("small",null,sm2));
+    if(off){ const o=el("small"); const st=el("strong",null,off); st.style.fontWeight="700"; st.style.color="var(--ink)"; o.appendChild(st); t.appendChild(o); }
+    return t;
+  }
+  function drawCond(r,failed){
+    const prevFx=fxCur; fxDrop(); if(skyCur&&SKY_RO) SKY_RO.unobserve(skyCur); skyCur=null;
+    if(!r){ condBox.replaceChildren(note("Couldn't get current conditions. Will try again in a few minutes.","note cvmsg err")); return; }
+    const ex=extras||{}, hist=ex.hist||null, pr=ex.precip||null, tz=curTz;
+    const hi=hist&&hist.hi!==null?Math.max(hist.hi,r.t):null, lo=hist&&hist.lo!==null?Math.min(hist.lo,r.t):null;
+    const cs={id:"__cv",tz,label:curPl.title,snowIn:pr?pr.snow:null,cvFx:cvFxFor(r),latest:{temp:r.t,feels:cvFeels(r.t,r.w,r.rh),hum:r.rh,wind:r.w,dir:r.dir,gust:(r.g!==null&&r.g!==undefined&&Math.round(r.g)>Math.round(r.w))?r.g:null,press:r.pr,todayHi:hi,todayLo:lo,rainToday:pr?pr.rain:null}};
+    const L=cs.latest, c=card("st"); c.style.setProperty("--c","var(--mute)"); c.classList.add("cvfx");
+    const hz={terrain:cvTerrCached(curPl.lat,curPl.lon)||"flat",pop:curPl.pop>0?curPl.pop:null}, bn=skyBanner(curPl.title,(r.txt||"").slice(0,40),curPl.lat,curPl.lon,Date.now(),r.sky?r.sky.lv:skyLevelWords(r.txt),r.sky&&r.sky.src==="model"?"modeled":"",hz);
+    c.appendChild(bn);
+    cvTerrain(curPl.lat,curPl.lon).then(t=>{ if(t&&t!==hz.terrain){ hz.terrain=t; if(bn._w&&bn.isConnected) bn._fill(bn._w); } });
+    const row=el("div","row"); const hp=el("span","pill"); row.appendChild(hp); c.appendChild(row);
+    const clock=ms=>new Date(ms).toLocaleTimeString([],{hour:"numeric",minute:"2-digit",timeZone:tz,timeZoneName:"short"});
+    if(r.kind==="stations"){ const late=r.age>60; hp.className="pill "+(late?"warn":"ok"); hp.textContent=(late?"▲ Late":"● Reporting")+" · "+(r.age<1?"just now":Math.round(r.age)+" min ago")+" · last reading "+clock(r.newest); }
+    else { hp.className="pill warn"; hp.textContent="▲ Modeled · not measured"; }
+    let src;
+    if(r.kind==="stations"){
+      const age=r.age<1?"just now":Math.round(r.age)+" min ago";
+      src=r.n===1?"Station "+r.near.id+" ("+r.near.name+"), "+r.near.d.toFixed(1)+" mi away, reported "+age+".":r.n+" stations, "+r.dmin.toFixed(1)+" to "+r.dmax.toFixed(1)+" mi away, "+(Math.round(r.tmin)===Math.round(r.tmax)?"all "+Math.round(r.tmin):Math.round(r.tmin)+" to "+Math.round(r.tmax))+"°F, showing the middle reading. Nearest: "+r.near.id+" ("+r.near.name+"). Newest report "+age+".";
+    } else src="Modeled for this spot, not measured. No nearby station had a fresh reading.";
+    c.appendChild(el("div","note",(r.txt?r.txt+". ":"")+src));
+    if(r.kind==="stations"&&r.age>60) c.appendChild(el("div","note cvlate","NWS airport data is running late."));
+    const tiles=el("div","tiles");
+    const trend=(hist&&hist.ago!==null)?Math.round(r.t-hist.ago):null;
+    tiles.appendChild(cvTile(cs,"temp",fmt0(L.temp)+"°F",trend===null?"":(trend>0?"▲ ":trend<0?"▼ ":"● ")+Math.abs(trend)+"° in 3 h",offDial(L.temp)));
+    tiles.appendChild(cvTile(cs,"feels",fmt0(L.feels)+"°F","",offDial(L.feels)));
+    tiles.appendChild(L.hum==null?cvTile(cs,"hum","–","not reported",null,null,true):cvTile(cs,"hum",fmt0(L.hum)+"%",""));
+    tiles.appendChild(cvTile(cs,"wind",(Math.round(L.wind)<1?"calm":fmt0(L.wind)+" mph "+cardinal(L.dir)),L.gust?"gust "+fmt0(L.gust)+" mph":""));
+    tiles.appendChild(L.press==null?cvTile(cs,"press","–","not reported",null,null,true):cvTile(cs,"press",fmt2(L.press)+" in",""));
+    if(!pr) tiles.appendChild(cvTile(cs,"rain","–","modeled, not available",null,null,true));
+    else { const pp=precipParts(cs); tiles.appendChild(pp.showSnow?cvTile(cs,"rain",fmt2(pp.water)+" in","rain "+fmt2(pp.rain)+" in",null,"snow "+snowStr(pp.snow)+" in"):cvTile(cs,"rain",fmt2(pp.water)+" in","since midnight, modeled")); }
+    tiles.appendChild(hi===null?cvTile(cs,"hilo","–","not available",null,null,true):cvTile(cs,"hilo",fmt0(L.todayHi)+"° / "+fmt0(L.todayLo)+"°","so far today",offDial(L.todayLo,L.todayHi)));
+    c.appendChild(tiles);
+    c.appendChild(el("div","note cvgap",failed?"Couldn't update, showing the reading from "+clock(lastAt)+".":"Updated "+cvTime(tz)+". Refreshes every 5 minutes."));
+    condBox.replaceChildren(c);
+    skyCur=c.querySelector(".skyb"); if(skyCur&&SKY_RO) SKY_RO.observe(skyCur);
+    fxCur=new Fx(c,cs,true); if(prevFx&&prevFx.s.cvFx&&prevFx.s.label===cs.label){ fxCur.sus=prevFx.sus; fxCur.gus=prevFx.gus; } FX_LIST.push(fxCur); if(FX_ON) fxKick();
+  }
+  function drawAlerts(){
+    if(!curPl) return;
+    const now=Math.floor(Date.now()/1000);
+    let list=[]; if(alerts){ const alive=alerts.filter(a=>a.end===null||a.end>now), keys=new Set(alive.map(a=>a.key)); list=alive.filter(a=>!(a.supersededBy||[]).some(k=>keys.has(k))); }
+    const sig=(alerts?"y":"n")+(alertsErr?"e":"")+alertsAt+"|"+list.map(a=>a.key+"|"+alertWhen(a,curTz)).join(";");
+    if(sig===alSig) return; alSig=sig;
+    const stamp=alertsAt?new Date(alertsAt).toLocaleTimeString([],{hour:"numeric",minute:"2-digit",timeZone:curTz,timeZoneName:"short"}):"";
+    const frag=document.createDocumentFragment();
+    if(list.length){ const wrap=el("div","alerts"); list.forEach(a=>{ const b=alertBox(a,{tz:curTz},alOpen.has(a.key),true); b.addEventListener("toggle",()=>{ if(b.open) alOpen.add(a.key); else alOpen.delete(a.key); }); wrap.appendChild(b); }); frag.appendChild(wrap); }
+    if(alerts===null&&alertsErr) frag.appendChild(note("Couldn't check for alerts. Don't assume there are none. Will try again in a few minutes.","note cvmsg err"));
+    else if(alertsErr) frag.appendChild(note("Couldn't update alerts, showing the check from "+stamp+".","note cvmsg err"));
+    else if(alerts) frag.appendChild(el("div","note cvgap",list.length?"Alerts for this exact spot from the National Weather Service. Checked "+stamp+".":"No active alerts for this spot. Checked "+stamp+"."));
+    alBox.replaceChildren(frag);
+  }
+  async function loadAlerts(pl){
+    const my=++alSeq; alTry=Date.now();
+    try{ const j=await cvGet("https://api.weather.gov/alerts/active?point="+pl.lat.toFixed(4)+","+pl.lon.toFixed(4)); if(my!==alSeq||curPl!==pl) return; alerts=cvTidyAlerts(j.features,Math.floor(Date.now()/1000)); alertsAt=Date.now(); alertsErr=false; }
+    catch(e){ if(my!==alSeq||curPl!==pl) return; alertsErr=true; }
+    alSig=null; drawAlerts();
+  }
+  async function loadExtras(pl,r){
+    if(extras&&Date.now()-exAt<1800000) return;
+    exAt=Date.now(); const keep=extras||{};
+    const [h,p]=await Promise.allSettled([r.kind==="stations"&&r.used.length?cvHistory(r.used,pl.tz):Promise.resolve(null),cvPrecipToday(pl,pl.tz)]);
+    if(curPl!==pl) return;
+    extras={hist:h.status==="fulfilled"?h.value:keep.hist||null,precip:p.status==="fulfilled"?p.value:keep.precip||null};
+    if(last) drawCond(last,false);
+  }
+  async function loadCond(pl){
+    const my=++condSeq; tryAt=Date.now(); const startedAt=tryAt;
+    try{ const r=await cvConditions(pl); if(my!==condSeq||curPl!==pl) return; r.sky=await cvSky(pl,r).catch(()=>null); if(my!==condSeq||curPl!==pl) return; last=r; lastAt=startedAt; drawCond(r,false); loadExtras(pl,r); loadSum(pl,r); }
+    catch(e){ if(my!==condSeq||curPl!==pl) return; lastAt=last?lastAt:startedAt; drawCond(last,!!last); }
+  }
+  function drawFc(){
+    if(!curPl) return;
+    if(!fc){ fcBox.replaceChildren(note("Couldn't get the forecast. Will try again in a few minutes.","note cvmsg err")); return; }
+    fcHour=new Date().getHours();
+    const s={id:"__cv",tz:curTz,lat:curPl.lat,lon:curPl.lon}, f=document.createDocumentFragment();
+    const hs=fc.hours?hourlySection(s,fc.hours):null;
+    if(hs) f.appendChild(hs); else if(!fc.hours) f.appendChild(section("Hourly",note("Couldn't get the hourly forecast.","note cvmsg err")));
+    if(fc.days&&fc.days.length) f.appendChild(section("Forecast",forecastCards(s,fc.days),"Forecast comes from the National Weather Service for this spot, refreshed about every 30 minutes while this page is open. Chance of rain is the higher of the day and the night."));
+    else f.appendChild(section("Forecast",note("Couldn't get the daily forecast.","note cvmsg err")));
+    if(fcErr){ const when=new Date(fcAt).toLocaleTimeString([],{hour:"numeric",minute:"2-digit",timeZone:curTz,timeZoneName:"short"}); f.appendChild(note("Couldn't update the forecast, showing the one from "+when+".","note cvmsg err")); }
+    fcBox.replaceChildren(f);
+  }
+  async function loadFc(pl){
+    const my=++fcSeq; fcTry=Date.now(); const at=fcTry;
+    try{
+      const r=await cvForecast(pl); if(my!==fcSeq||curPl!==pl) return;
+      const miss=!r.hours||!r.days;
+      fc={hours:r.hours||(fc&&fc.hours)||null,days:r.days||(fc&&fc.days)||null};
+      fcErr=miss&&!!fcAt; if(!miss) fcAt=at; else if(!fcAt) fcAt=at;
+      drawFc();
+    }catch(e){ if(my!==fcSeq||curPl!==pl) return; fcErr=!!fc; drawFc(); }
+  }
+  function drawSum(){
+    if(!curPl) return;
+    if(!sum){ sumBox.replaceChildren(sumErr?section("Daily summary",note("Couldn't get the daily summary. Will try again in a few minutes.","note cvmsg err")):note("Getting the daily summary...")); return; }
+    const cs={id:"__cv",tz:curTz,lat:curPl.lat,lon:curPl.lon,label:curPl.title}, f=document.createDocumentFragment();
+    const txt=sum.modeled?"Modeled for this spot, not measured: no weather station nearby had enough readings, so highs, lows and wind come from a forecast model and the other numbers are left out. Click a day to open the full numbers for it. Last 7 days.":
+      "Last 7 days from the same weather stations as the tiles above: each station's own high, low and average for the day, then the middle value. Rain and snow are modeled (a forecast model's estimate, because most of these stations don't report rain amounts)"+(sum.precip?"":", and that part could not be loaded right now")+". Click a day to open the full numbers for it. Days are midnight to midnight local time.";
+    f.appendChild(section("Daily summary",summaryTable(cs,sum.rows),txt));
+    if(sumErr){ const when=new Date(sumAt).toLocaleTimeString([],{hour:"numeric",minute:"2-digit",timeZone:curTz,timeZoneName:"short"}); f.appendChild(note("Couldn't update the daily summary, showing the one from "+when+".","note cvmsg err")); }
+    sumBox.replaceChildren(f);
+  }
+  async function loadSum(pl,r){
+    if(sum&&!sumErr&&Date.now()-sumAt<1800000) return;
+    const my=++sumSeq, at=Date.now();
+    try{ const x=await cvSummary(pl,r); if(my!==sumSeq||curPl!==pl) return; sum=x; sumAt=at; sumErr=false; drawSum(); }
+    catch(e){ if(my!==sumSeq||curPl!==pl) return; sumErr=true; if(!sum) sumAt=0; drawSum(); }
+  }
+  async function loadShapes(pl){
+    const my=++shSeq; shTry=Date.now();
+    try{ const r=await cvShapes(pl); if(my!==shSeq||curPl!==pl) return; shapesSt={checked:r.checked,shapes:r.shapes,err:false}; }
+    catch(e){ if(my!==shSeq||curPl!==pl) return; shapesSt={checked:shapesSt.checked,shapes:shapesSt.shapes,err:true}; }
+    if(RADAR&&RADAR.drawAlerts) RADAR.drawAlerts();
+  }
+  async function choose(pick,tok){
+    show(note("Finding the forecast area..."));
+    try{ const pl=await cvPoint(pick); if(tok!==CV_SEQ.n) return; showPlace(pl); }
+    catch(e){ fail(notFound(e)?"The National Weather Service doesn't cover that spot. This works for US places only.":GENERIC,tok); }
+  }
+  function showPicks(picks){
+    const box=el("div"); box.appendChild(note("More than one place matches. Pick one:"));
+    const list=el("div","cvpicks");
+    picks.forEach(p=>{ const b=el("button","cvpick"); b.type="button"; b.appendChild(el("span",null,p.label)); if(p.sub) b.appendChild(el("small",null,p.sub)); b.addEventListener("click",()=>{ choose(p,++CV_SEQ.n); }); list.appendChild(b); });
+    box.appendChild(list); show(box);
+  }
+  form.addEventListener("submit",async e=>{
+    e.preventDefault(); const q=inp.value.trim();
+    if(!q){ show(note("Type a place first.")); inp.focus(); return; }
+    const tok=++CV_SEQ.n; btn.disabled=true; show(note("Looking up..."));
+    try{
+      const picks=await cvSearch(q); if(tok!==CV_SEQ.n) return;
+      if(!picks.length) fail("Couldn't find that place. Try the city and state, a zip code, or the street address with its city.",tok);
+      else if(picks.length===1) await choose(picks[0],tok); else showPicks(picks);
+    }catch(err){ fail(GENERIC,tok); }
+    finally{ btn.disabled=false; }
+  });
+  form.appendChild(inp); form.appendChild(btn);
+  out.appendChild(note("Type a place and press Look up."));
+  const box=el("div"); box.appendChild(form); box.appendChild(out);
+  wrap.appendChild(section("Custom location",box));
+  if(CV_RESTORE){ const p=CV_RESTORE; CV_RESTORE=null; inp.value=p.label; choose(p,++CV_SEQ.n); }
+  UPDATERS.push(fxKick);
+  UPDATERS.push(()=>{ if(!curTz) return; const t=out.querySelector(".cvtimeval"); if(t) t.textContent=cvTime(curTz); });
+  UPDATERS.push(()=>{ if(!curPl||document.hidden) return; if(Date.now()-tryAt>=300000) loadCond(curPl); });
+  UPDATERS.push(()=>{ if(!curPl) return; if(!document.hidden&&Date.now()-alTry>=300000) loadAlerts(curPl); else drawAlerts(); });
+  UPDATERS.push(()=>{ if(!curPl||document.hidden) return; if(Date.now()-shTry>=300000) loadShapes(curPl); });
+  UPDATERS.push(()=>{ if(!curPl) return; if(!document.hidden&&Date.now()-fcTry>=(fc&&!fcErr?1800000:300000)) loadFc(curPl); else if(fc&&new Date().getHours()!==fcHour) drawFc(); });
+  return wrap;
+}
+function forecastCards(s,fc){ const g=el("div","grid fc"); fc.slice(0,5).forEach(d=>{ const c=card(); c.appendChild(wxIcon(d.icon)); c.appendChild(el("div","d",d.tonight?"Tonight":d.day)); const hl=el("div","hl",d.hi==null?"–":fmt0(d.hi)+"°"); hl.appendChild(el("small",null," / "+(d.lo==null?"–":fmt0(d.lo)+"°"))); c.appendChild(hl); c.appendChild(el("div",null,d.phrase||"")); c.appendChild(el("p",null,(d.rainChance==null?"":d.rainChance+"% chance of rain · ")+(d.wind!=null?"wind "+d.wind+" mph "+(d.windDir||""):""))); if(d.text) c.appendChild(el("p",null,d.text.replace(/ \./g,"."))); { const sl=sunLine(s,d.date,true); if(sl) c.appendChild(el("p",null,sl)); } g.appendChild(c); }); return g; }
 function render(){
   radarDestroy();
   fxReset(); UPDATERS.length=0; pruneOpen(); UPDATERS.push(alertNote); alertNote();
   const main=document.getElementById("main"); main.replaceChildren(); hideTip();
+  document.body.classList.toggle("cv",isCV());
+  if(isCV()){ main.appendChild(customView()); return; }
   let draws=[];
   if(state.station==="all"){
     const g=el("div","grid cards"); ST.forEach(s=>g.appendChild(stationCard(s))); main.appendChild(section("Right now",g,"Data provided by Weather Underground. Stations are Acurite personal weather stations."));
@@ -1338,7 +2250,7 @@ function render(){
     { const f=document.createDocumentFragment(); f.appendChild(alertsBlock(s)); f.appendChild(stationHead(s)); main.appendChild(section("Right now",f,"Data provided by Weather Underground. Stations are Acurite personal weather stations.")); }
     const fc=(DATA.forecast[s.id]||{}).days||[];
     { const hsec=hourlySection(s); if(hsec) main.appendChild(hsec); }
-    if(fc.length){ const g=el("div","grid fc"); fc.slice(0,5).forEach(d=>{ const c=card(); c.appendChild(wxIcon(d.icon)); c.appendChild(el("div","d",d.tonight?"Tonight":d.day)); const hl=el("div","hl",d.hi==null?"–":fmt0(d.hi)+"°"); hl.appendChild(el("small",null," / "+(d.lo==null?"–":fmt0(d.lo)+"°"))); c.appendChild(hl); c.appendChild(el("div",null,d.phrase||"")); c.appendChild(el("p",null,(d.rainChance==null?"":d.rainChance+"% chance of rain · ")+(d.wind!=null?"wind "+d.wind+" mph "+(d.windDir||""):""))); if(d.text) c.appendChild(el("p",null,d.text.replace(/ \./g,"."))); { const sl=sunLine(s,d.date,true); if(sl) c.appendChild(el("p",null,sl)); } g.appendChild(c); }); main.appendChild(section("Forecast",g,"Forecast comes from the National Weather Service for this station's location, refreshed about once an hour. Chance of rain is the higher of the day and the night.")); }
+    if(fc.length){ main.appendChild(section("Forecast",forecastCards(s,fc),"Forecast comes from the National Weather Service for this station's location, refreshed about once an hour. Chance of rain is the higher of the day and the night.")); }
     main.appendChild(radarSection(s));
     const mp=metricPanel(s,state.metric); main.appendChild(mp.node); draws=mp.charts;
     { const ri=recordInfo(s); const rn=ri&&ri.name?ri.name.replace(/\b([a-z])([a-z\x27]*)/gi,(m,a,b)=>a.toUpperCase()+b.toLowerCase()).replace(/ Ap$/,""):"";
@@ -1356,13 +2268,13 @@ function render(){
 
 /* ---------- controls ---------- */
 const ISO=/^\d{4}-\d{2}-\d{2}$/;
-function saveView(){ try{ sessionStorage.setItem("wxView",JSON.stringify({y:window.scrollY||0,days:[...DAYSTATE.entries()],t:Date.now()})); }catch(e){} }
+function saveView(){ try{ sessionStorage.setItem("wxView",JSON.stringify({y:window.scrollY||0,days:[...DAYSTATE.entries()],c:(isCV()&&state.station==="custom"&&CV_CUR)?CV_CUR.pick:null,t:Date.now()})); }catch(e){} }
 function restoreView(){ try{ const raw=sessionStorage.getItem("wxView"); sessionStorage.removeItem("wxView"); if(!raw) return null; const v=JSON.parse(raw); if(!v||Date.now()-v.t>120000) return null; (v.days||[]).forEach(([k,o])=>DAYSTATE.set(k,o)); return v; }catch(e){ return null; } }
 /* push=true adds a history step (used when the station changes, so the Back button returns to the previous view). Everything else just updates the address in place. */
 function setHash(push){ try{ let h="#station="+state.station+"&range="+state.range+"&metric="+state.metric; if(state.range==="custom") h+="&from="+state.from+"&to="+state.to; if(push&&h!==location.hash) history.pushState(null,"",h); else history.replaceState(null,"",h); }catch(e){} }
 function readHash(){
   const p=new URLSearchParams(location.hash.slice(1));
-  if(p.get("station")&&(p.get("station")==="all"||byId(p.get("station")))) state.station=p.get("station");
+  if(p.get("station")&&(p.get("station")==="all"||byId(p.get("station"))||(CUSTOM_ON&&["current","custom"].includes(p.get("station"))))) state.station=p.get("station");
   if(RANGES.some(r=>r[0]===p.get("range"))) state.range=p.get("range");
   if(p.get("range")==="custom"&&ISO.test(p.get("from")||"")&&ISO.test(p.get("to")||"")&&p.get("from")<=p.get("to")){ state.range="custom"; state.from=p.get("from"); state.to=p.get("to"); }
   if(METRIC_LABEL[p.get("metric")]) state.metric=p.get("metric");
@@ -1371,13 +2283,13 @@ const fmtDay=d=>{ const [y,m,dd]=d.split("-").map(Number); return new Date(Date.
 function rangeLabel(){ if(state.range==="custom") return state.from===state.to? mdy(state.from) : mdy(state.from)+" to "+mdy(state.to); return RANGES.find(r=>r[0]===state.range)[1]; }
 function init(){
   readHash();
-  const sel=document.getElementById("stSel"); [["all","All stations (overview)"],...ST.map(s=>[s.id,s.label])].forEach(([v,t])=>{ const o=el("option",null,t); o.value=v; sel.appendChild(o); }); sel.value=state.station;
+  const sel=document.getElementById("stSel"); [["all","All stations (overview)"],...ST.map(s=>[s.id,s.label])].forEach(([v,t])=>{ const o=el("option",null,t); o.value=v; sel.appendChild(o); }); if(CUSTOM_ON) [["current","Current location"],["custom","Custom location..."]].forEach(([v,t])=>{ const o=el("option",null,t); o.value=v; sel.appendChild(o); }); sel.value=state.station;
   const fbtn=document.getElementById("fbtn"), fpanel=document.getElementById("fpanel"), dateBtn=document.getElementById("dateBtn"), datePop=document.getElementById("datePop");
   const dFrom=document.getElementById("dFrom"), dTo=document.getElementById("dTo"), seg=document.getElementById("rangeSeg");
   const minD=DATA.start, maxD=dateInTz(NOW,HOME_TZ);
   dFrom.min=dTo.min=minD; dFrom.max=dTo.max=maxD;
   const phone=()=>window.matchMedia("(max-width:700px)").matches;
-  const status=()=>{ fbtn.textContent=""; fbtn.appendChild(el("span",null,rangeLabel()+" · "+(state.station==="all"?"All stations":short(byId(state.station))))); fbtn.appendChild(el("span",null,fpanel.classList.contains("open")?"\u25B4":"\u25BE")); };
+  const status=()=>{ fbtn.textContent=""; fbtn.appendChild(el("span",null,rangeLabel()+" · "+(state.station==="all"?"All stations":(isCV()?CUSTOM_VIEWS[state.station]:short(byId(state.station)))))); fbtn.appendChild(el("span",null,fpanel.classList.contains("open")?"\u25B4":"\u25BE")); };
   const closePanel=()=>{ fpanel.classList.remove("open"); fbtn.setAttribute("aria-expanded","false"); status(); };
   const closeDates=()=>{ datePop.classList.remove("open"); dateBtn.setAttribute("aria-expanded","false"); };
   const mk=()=>{ seg.replaceChildren(); RANGES.forEach(([v,t])=>{ const b=el("button",null,t); b.setAttribute("aria-pressed",state.range===v); b.addEventListener("click",()=>{ state.range=v; dFrom.value=dTo.value=""; setHash(); mk(); closeDates(); if(phone()) closePanel(); render(); }); seg.appendChild(b); }); dateBtn.textContent=state.range==="custom"?rangeLabel():"Pick dates"; dateBtn.style.borderColor=state.range==="custom"?"var(--purple)":""; status(); };
@@ -1408,11 +2320,11 @@ function init(){
   mk();
   document.getElementById("stationsLine").textContent=ST.map(short).join(" · ");
   document.getElementById("foot").textContent="Data provided by Weather Underground (personal weather stations), history collected every 15 minutes by wu_collect.py and saved in monthly CSV files, plus a live reading every 5 minutes for the Right now cards. Forecast: National Weather Service. Alerts: National Weather Service (api.weather.gov), checked every 5 minutes for each station's chosen address by wx_alerts.py. Pressure is the average of each 5-minute min and max, so it is rounded to 0.1 in. Right now cards use a live reading when it is newer than the saved history. Page built "+stamp(BUILT)+" "+zoneAbbr(BUILT)+" · history saved since "+((d)=>{const p=d.split("-"); return (+p[1])+"/"+(+p[2]);})(DATA.start)+".";
-  const view=restoreView();
+  const view=restoreView(); CV_RESTORE=(view&&view.c&&typeof view.c.lat==="number"&&typeof view.c.lon==="number"&&view.c.label)?view.c:null;
   initRefresh();
   render();
   if(view&&view.y) setTimeout(()=>window.scrollTo(0,view.y),80);
-  initAutoUpdate(); setInterval(()=>UPDATERS.forEach(f=>f()),60000); let rt; window.addEventListener("resize",()=>{ clearTimeout(rt); rt=setTimeout(render,200); });
+  initAutoUpdate(); setInterval(()=>UPDATERS.forEach(f=>f()),60000); let rt; window.addEventListener("resize",()=>{ clearTimeout(rt); rt=setTimeout(()=>{ if(!isCV()) render(); },200); });
 }
 function initRefresh(){
   const btn=document.getElementById("refreshBtn"), msg=document.getElementById("refreshMsg");
@@ -1461,7 +2373,7 @@ function initAutoUpdate(){
      closed keeps focus, so focus alone must not count, or the page would never refresh after someone picked a station. */
   let lastKey=0; document.addEventListener("keydown",()=>{ lastKey=Date.now(); },true);
   const busyUI=()=>{ const open=id=>{ const e=document.getElementById(id); return e&&e.classList.contains("open"); }; const a=document.activeElement;
-    return open("datePop")||open("fpanel")||(a&&/^(INPUT|TEXTAREA)$/.test(a.tagName)&&Date.now()-lastKey<60000); };
+    return isCV()||open("datePop")||open("fpanel")||(a&&/^(INPUT|TEXTAREA)$/.test(a.tagName)&&Date.now()-lastKey<60000); };
   const tick=async why=>{
     if(REFRESHING) return;
     const t1=Date.now();
@@ -1480,7 +2392,7 @@ function initAutoUpdate(){
         saveView();
         /* Reload to an address with the build time on it (?v=...). The browser has never seen that address, so it has to fetch a fresh
            copy of the page instead of handing back the cached one. The #station=... part is kept, so the view stays put. */
-        location.replace(location.pathname+"?v="+encodeURIComponent(m.built)+location.hash);
+        location.replace(location.pathname+"?v="+encodeURIComponent(m.built)+(CUSTOM_ON?"&custom=1":"")+location.hash);
         return;
       }
       if(newer&&busyUI()) note("newer data waiting, a menu is open");

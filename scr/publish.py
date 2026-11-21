@@ -67,7 +67,7 @@ COORD = re.compile(r'"(?:alert_)?(?:lat|lon)"\s*:\s*-?\d+\.\d{4,}')
 KEYURL = re.compile(r"apiKey=[0-9a-fA-F]{20,}")
 HEX32 = re.compile(r"\b[0-9a-f]{32}\b")
 # e-mail-looking text that is not an address (none known yet; add exact strings here after checking by hand)
-EMAIL_OK = set()
+EMAIL_OK = {"mike@fogel.ca", "info@w8r.name"}   # checked by hand 2026-11-21: the two library authors' public copyright lines in scr/vendor/polygon-clipping (MIT license text and the file header)
 
 
 # ---------------------------------------------------------------- secrets and private references
@@ -185,6 +185,9 @@ def approved():
     for p in sorted((HERE / "vendor" / "leaflet").glob("*")):
         if p.is_file():
             add(p, f"scr/vendor/leaflet/{p.name}")
+    for p in sorted((HERE / "vendor" / "polygon-clipping").glob("*")):   # joins alert zones into one outline (MIT license notice kept)
+        if p.is_file():
+            add(p, f"scr/vendor/polygon-clipping/{p.name}")
     for p in sorted((HERE / "vendor" / "lucide").glob("*")):          # radar speed icons: license notice kept (ISC)
         if p.is_file():
             add(p, f"scr/vendor/lucide/{p.name}")
