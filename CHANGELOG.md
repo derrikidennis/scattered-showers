@@ -2,6 +2,10 @@
 
 Scattered Showers, newest first. Version numbers: the first number changes for a rebuild, the middle one when something new is added, the last one for fixes.
 
+## 1.1.1 (2026-11-22)
+
+- The line under the page title now says "or any place you pick" (on its own line on a phone), so visitors can tell the page is not limited to the three stations. The README intro and the installed app's description match.
+
 ## 1.1.0 (2026-11-22)
 
 New
@@ -10,7 +14,8 @@ New
 - **Hourly forecast redrawn** as a temperature line with a weather icon per hour. The line and the temperature and rain-chance numbers use the same colors as the Temperature gauge. Streaks beside an icon mean wind of 15 mph or more that hour.
 - **Temperature colors** now run in eight bands (violet below 10, indigo, blue, blue-green, green, yellow, orange, red above 90) instead of four. This changes the gauge, the hourly line and the big numbers on the overview page. The brown that used to show up in the 60s on the light theme is gone.
 - **Credits** at the bottom of the page for every data source and code library, and a fuller README.
-- Version number in the page footer.
+- Version number in the page footer, and this changelog.
+
 
 Fixes
 - Phone layout for long station names: "House of / Shih Tzus / Elgin, TX" instead of "House of Shih / Tzus".
