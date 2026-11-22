@@ -16,6 +16,8 @@ The stations are Acurite personal weather stations in Fort Wayne (Indiana), Elgi
 - Time ranges from Today up to everything saved, or pick your own dates
 - A station reporting health table that counts outages
 - Active National Weather Service alerts for each location, colored the way the NWS colors them
+- A sky banner at the top of each station's page: the town drawn to match the place, with sky, rain, wind, fog and snow that follow what is really happening. Rain and wind come from the station itself, sky from the nearest airport reports, and the page says so when something comes from an airport or from radar
+- Current location and Custom location: type an address, city, zip code or airport code (or let the browser find you) and get the same banner, conditions, forecast and radar for that spot
 - A radar map that fits each station, with a snowfall estimate for the last 72 hours
 - Record highs and lows for every calendar day, from the long NOAA climate record
 - Light, dark or automatic theme, plus optional rain and wind animations (the Effects button)
@@ -49,19 +51,27 @@ A few choices that look odd until you know why:
 
 The repo is public and the stations are at people's homes, so the robot refuses to publish anything it shouldn't. Station coordinates are rounded to 3 decimals (about 100 meters). No street addresses appear anywhere. API keys live in GitHub secrets and never in a file. Before every publish, `scr/publish.py --check` scans the page and the data and stops the whole run if it finds coordinates with more than 3 decimals, street-address-looking text, an email address, or the shape of a key.
 
+**Custom and Current location.** What you type, or the spot your browser reports, goes straight from your browser to the services in the table below. It doesn't pass through any server of mine. The page remembers terrain and town-size lookups in your browser's own storage so it doesn't ask twice.
+
 ## Where the data comes from
 
 | Source | Used for | Key needed |
 |---|---|---|
 | [Weather Underground](https://www.wunderground.com/) personal weather station API | Station readings | Yes |
 | [National Weather Service](https://www.weather.gov/documentation/services-web-api) | Forecasts and alerts | No, but it asks callers to identify themselves |
-| [Open-Meteo](https://open-meteo.com/) | Hourly snowfall estimate (a model, not a measurement) | No |
 | [NOAA ACIS](https://www.rcc-acis.org/) | Record highs and lows | No |
 | [Iowa Environmental Mesonet](https://mesonet.agron.iastate.edu/) | NEXRAD radar tiles | No |
+| [NOAA MRMS and HRRR](https://www.nssl.noaa.gov/projects/mrms/) (NOAA map services) | Rain and snow type on the radar, and precipitation type at a spot | No |
+| [National Weather Service observations](https://www.weather.gov/documentation/services-web-api) | Airport sky reports for the banner, and Custom location conditions | No |
+| [Open-Meteo](https://open-meteo.com/) | Custom location: city search, elevation, modeled conditions and forecast; snowfall estimate. Credit required (CC BY 4.0), free use is non-commercial | No |
+| [OpenStreetMap Nominatim](https://nominatim.openstreetmap.org/) | Custom location: landmark search, one search per press of Look up, never while typing (their rule) | No |
+| [U.S. Census Geocoder](https://geocoding.geo.census.gov/) and [Zippopotam.us](https://zippopotam.us/) | Custom location: address and zip code search | No |
+| [U.S. Census Bureau population estimates](https://www.census.gov/programs-surveys/popest.html) | Town sizes, baked into the page so the banner picks the right kind of town | No |
+| [OurAirports](https://ourairports.com/data/) (public domain) | Airport codes for Custom location | No |
 | [RainViewer](https://www.rainviewer.com/) | Backup radar | No |
 | [CARTO](https://carto.com/) and [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors | Map background | Yes |
 
-Bundled in `scr/vendor/` with their licenses: [Leaflet](https://leafletjs.com/) (BSD 2-Clause) for the map and [Lucide](https://lucide.dev/) (ISC) for the icons.
+Bundled in `scr/vendor/` with their licenses: [Leaflet](https://leafletjs.com/) (BSD 2-Clause) for the map, [Lucide](https://lucide.dev/) (ISC) for the icons and [polygon-clipping](https://github.com/mfogel/polygon-clipping) (MIT, Mike Fogel, forked from martinez by Alexander Milevski) for joining alert zones into one outline.
 
 ## What's in this repo
 

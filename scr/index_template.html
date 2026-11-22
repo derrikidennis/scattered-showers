@@ -156,6 +156,7 @@ th{color:var(--mute);font-weight:600;position:sticky;top:0;background:var(--card
 .tile small{display:block;color:var(--mute);font-size:12px;margin-top:2px;min-height:1.2em;text-align:center}
 .grid.one{grid-template-columns:1fr}
 footer{margin-top:36px;color:var(--mute);font-size:12.5px;border-top:1px solid var(--line);padding-top:12px}
+footer a{color:inherit;text-decoration:underline}
 .dim{opacity:.55}
 .fpanel{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
 .fbtn{display:none}
@@ -244,7 +245,7 @@ html:not(.still) .skstat{display:none}
 .skyb svg.skysvg{position:absolute;left:0;top:0;width:100%;height:100%;display:block;overflow:hidden}
 .skyb::after{content:"";position:absolute;left:0;right:0;bottom:0;height:64px;background:linear-gradient(to bottom,rgba(6,10,18,0),rgba(6,10,18,.55));pointer-events:none}
 .skyn{position:absolute;z-index:2;left:18px;bottom:10px;font-size:15px;line-height:1.25;letter-spacing:.08em;text-transform:uppercase;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.75),0 0 9px rgba(0,0,0,.5);max-width:55%}
-.skyw{position:absolute;z-index:2;right:18px;bottom:10px;font-size:15px;line-height:1.25;color:#fff;max-width:42%;text-align:right;text-shadow:0 1px 3px rgba(0,0,0,.75),0 0 9px rgba(0,0,0,.5)}
+.skyw{white-space:pre-line;position:absolute;z-index:2;right:18px;bottom:10px;font-size:15px;line-height:1.25;color:#fff;max-width:42%;text-align:right;text-shadow:0 1px 3px rgba(0,0,0,.75),0 0 9px rgba(0,0,0,.5)}
 .sktw{animation:sktw 3s ease-in-out infinite alternate}@keyframes sktw{from{opacity:.4}to{opacity:1}}
 .skrot{transform-origin:0 0;animation:skrot 90s linear infinite}@keyframes skrot{to{transform:rotate(360deg)}}
 .skcl{will-change:transform}@keyframes skdrift{to{transform:translateX(var(--d))}}
@@ -324,8 +325,8 @@ const DATA = /*__DATA__*/null;
 const NS = "http://www.w3.org/2000/svg";
 const RANGES = [["today","Today"],["24h","Last 24 hours"],["7d","Last 7 days"],["30d","Last 30 days"],["all","Everything saved"]];
 const state = {station:"all", range:"today", from:null, to:null, metric:"temp"};
-/* Custom location (added 2026-11-19, step 2). Hidden switch: this only exists when the address carries ?custom=1. It is not a password, it is just not advertised. */
-const CUSTOM_ON=/[?&]custom=1(&|$)/.test(location.search);
+/* Custom location (added 2026-11-19). It was behind a hidden ?custom=1 switch while it was being built; since 2026-11-22 it is on for everyone. */
+const CUSTOM_ON=true;
 let CV_ASK=false;   /* true only when the visitor just picked Current location in the dropdown: then the page asks for the phone position at once. A reload, a saved link or the Back button shows the button instead. */
 let CV_HERE=null;   /* Current location only: the last good reading {lat,lon,at,pl}, page memory only (gone on reload), used for the 5 mile / 5 minute reuse rule */
 let CV_CUR=null, CV_RESTORE=null;   /* the custom place on screen; CV_RESTORE carries it across a theme or refresh reload (sessionStorage, two minutes, removed when read) */
@@ -721,13 +722,13 @@ try{ const v=localStorage.getItem(FX_KEY);
   if(v==="off") FX_ON=false;
   else if(v!=="on" && window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches) FX_ON=false;   // device asks for less motion and nothing is saved yet
 }catch(e){}
-const FX_SNOW_ON=false;
+const FX_SNOW_ON=true;
 const FX_RGB=IS_LIGHT?{rain:"3,105,161",snow:"96,140,190",wind:"90,110,150"}:{rain:"130,226,255",snow:"255,255,255",wind:"170,180,215"};
 const FX_LIST=[]; let FX_IO=null, FX_RO=null, fxRaf=0, fxLast=0, fxT=0;
 /* the screen is a map with north at the top: a north wind blows down, a south wind blows up, a west wind blows right */
 const fxVec=d=>{ const a=d*Math.PI/180; return {x:Math.round(-Math.sin(a)*1000)/1000+0, y:Math.round(Math.cos(a)*1000)/1000+0}; };
 const fxPulse=T=>{ const a=Math.max(0,Math.sin(T*0.9)); return a*a*(0.5+0.5*Math.sin(T*0.31)); };
-function fxSnowLevel(s){ return 0; }   // 0 none, 1 flurries to 4 heavy. Filled in when snow goes live.
+function fxSnowLevel(s){ return s._snowFx||0; }   // 0 none, 1 flurries to 4 heavy. Set by the station banner (stationSky) from airport words or the radar type layer; only the station page's own canvas uses it.
 function fxInputs(f){
   const s=f.s, L=s.latest, none={rain:false,t:0,snow:0,wind:false,ws:0,wg:0,dir:null}, X=s.cvFx||null;   /* X: a custom place card, which has no rain gauge, so rain comes from the weather words (cvFxFor) */
   if(!X&&statusOf(s).cls!=="ok") return none;
@@ -735,7 +736,7 @@ function fxInputs(f){
   // wind lines: on at 15 sustained (off under 13), or gusts over 22 (off under 20), so a number hovering at the edge does not flicker
   if(ws>=15) f.sus=true; else if(ws<13) f.sus=false;
   if(wg>22) f.gus=true; else if(wg<20) f.gus=false;
-  const snow=X?(X.snow||0):(FX_SNOW_ON?fxSnowLevel(s):0);
+  const snow=X?(X.snow||0):(FX_SNOW_ON&&f.c&&f.c.classList.contains("head")?fxSnowLevel(s):0);
   const dir0=(L.dir==null||isNaN(+L.dir))?null:+L.dir, dir=(X&&dir0!=null)?(360-dir0)%360:dir0;
   return {pt:X?(X.pt||(snow>0?"s":"r")):(snow>0?"s":"r"),shower:!!(X&&X.shower),sshower:!!(X&&X.sshower),bz:X?(X.bz||0):0,rain:rate>0&&!snow, t:X?(X.rain?X.t:0):(rate>0?Math.max(0,Math.min(1,Math.log(rate/0.005)/Math.log(300))):0), snow, wind:(f.sus||f.gus)&&dir!=null, ws, wg, dir};
 }
@@ -1105,10 +1106,115 @@ function tileInfo(s,k){
     case "hilo": return [fmt0(L.todayHi)+"° / "+fmt0(L.todayLo)+"°","so far today",offDial(L.todayLo,L.todayHi)];
   }
 }
+/* B6: the sky banner on a station page. A station has no sky sensor, so the cloud level comes from the nearest National Weather Service reporters (mostly airports; the list is stored per station by scr/station_terrain.py, nearest first, the same list custom places use). The newest report within 75 minutes wins; the note under the banner says which reporter, how far, and how old. Nothing from the airport decides rain: that comes from the station's own gauge in a later step, so rain or storm words in an airport report only set the cloud level (overcast). If no reporter has a fresh report, the sky comes from the hourly forecast and says "(forecast)". Terrain and town size are stored per station too. */
+let skySt=null;
+const STAIR_PRECIP=/rain|shower|drizzle|snow|flurr|sleet|freezing|ice|thunder|t-storm|storm|fog|mist|haze|smoke|hail/i;
+function stationAirLevel(txt,layers){
+  let lv=skyLevelWords(txt);
+  if(lv==null){ const m={SKC:1,CLR:1,FEW:2,SCT:3,BKN:4,OVC:5,VV:5}; let best=0; (layers||[]).forEach(l=>{ const v=m[l&&l.amount]||0; if(v>best) best=v; }); if(best) lv=best; }
+  if(lv==null&&STAIR_PRECIP.test(txt)) lv=5;
+  return lv; }
+async function stationAir(s){
+  const now=Date.now();
+  const rs=await Promise.all((s.air||[]).map(async a=>{ try{
+    const j=await cvGet("https://api.weather.gov/stations/"+encodeURIComponent(a[0])+"/observations?limit=6");
+    for(const f of (j.features||[])){ const p=f.properties||{}, ts=Date.parse(p.timestamp); if(!isFinite(ts)) continue;
+      const age=(now-ts)/60000; if(age>75) return null; if(age<-10) continue;
+      const txt=String(p.textDescription||""), lv=stationAirLevel(txt,p.cloudLayers); if(lv==null) continue;
+      return {id:a[0],name:a[1],d:a[2],ts,age:Math.max(0,age),txt,lv}; }
+    return null; }catch(e){ return null; } }));
+  return rs.find(Boolean)||null; }   /* s.air is nearest first, so the first answer is the nearest reporter with a fresh sky report */
+function stationFcHour(s){
+  const H=((DATA.hourly||{})[s.id]||{}).hours||[], now=Date.now(); let best=null;
+  for(const h of H){ if(Date.parse(h.t)<=now) best=h; else break; }
+  return (best&&now-Date.parse(best.t)<=90*60000)?best:null; }
+/* mode: "wait" (first paint, level from the forecast hour, no words yet), "air" (o = the reporter's answer), "fc" (no fresh report: forecast words, labelled) */
+/* Rain in the station banner comes only from the station's own gauge. Rate above zero means rain. The gauge reads zero between bucket tips, so rain is held for 15 minutes after the last wet reading (or after today's total last rose). Level from the rate: under 0.10 in/hr light, 0.10 to 0.30 moderate, 0.30 to 1.0 heavy, 1.0 and up downpour. */
+function stationRain(s){
+  const L=s.latest; if(statusOf(s).cls!=="ok") return null;
+  const m=s._rw||(s._rw={ep:0,today:null,wet:0});
+  if(L.epoch!==m.ep){ const rose=m.today!=null&&L.rainToday!=null&&L.rainToday>m.today+0.0001; if((+L.rainRate||0)>0||rose) m.wet=L.epoch; m.ep=L.epoch; m.today=L.rainToday; }
+  if(!m.wet||L.epoch-m.wet>900) return null;
+  const r=+L.rainRate||0, lvl=r>=1?4:(r>=0.3?3:(r>=0.1?2:1));
+  return {lvl:lvl,words:["Light rain","Rain","Heavy rain","Downpour"][lvl-1]}; }
+/* Rain the nearest airport reports while this station's gauge is still dry: shown as "nearby" (showers get the shower picture), and the gauge takes over the moment it reads rain. Rain words only; snow and ice wait for the snow step. */
+function stationAirWet(o){
+  const w=cvWetOf({txt:o.txt}); if(!w) return null;
+  if(w.type==="rain"){
+    const th=/thunder|t-storm/i.test(o.txt), lvl=th?3:Math.min(3,w.lvl);
+    const nm=th?"Thunderstorm":((lvl===1?"Light ":(lvl===3?"Heavy ":""))+(w.shower?"showers":"rain")).replace(/^./,c=>c.toUpperCase());
+    return {type:"rain",lvl:lvl,shower:th?false:w.shower,bz:0,name:nm,words:nm+"\nnearby ("+o.id+")",min:w.min}; }
+  const t=String(o.txt).toLowerCase();
+  const nm=w.type==="snow"?(w.bz===2?"Blizzard":(w.bz===1?"Blowing snow":(/flurr/.test(t)?"Flurries":((w.lvl===1?"Light ":(w.lvl>=3?"Heavy ":""))+(w.shower?"snow showers":"snow")).replace(/^./,c=>c.toUpperCase())))):({mix:"Wintry mix",sleet:"Sleet",ice:"Freezing rain",hail:"Hail"})[w.type];
+  return {type:w.type,lvl:w.lvl,shower:w.shower,bz:w.bz||0,name:nm,words:nm+"\nnearby ("+o.id+")",min:w.min}; }
+/* Precipitation type at the station's spot from NOAA's MRMS precipitation-type layer (the same layer the radar map uses; gray = snow). Only asked when the station is 34F or colder. Returns "snow", "other" (rain or something else), "none" (no echo there) or null (no answer). */
+const TYPE_AT=new Map();
+async function typeAt(lat,lon){
+  const key=lat.toFixed(2)+","+lon.toFixed(2), m=TYPE_AT.get(key); if(m&&Date.now()-m.at<240000) return m.v;
+  let v=null;
+  try{ const d=0.05, ac=new AbortController(), to=setTimeout(()=>ac.abort(),7000);
+    const u="https://opengeo.ncep.noaa.gov/geoserver/conus/conus_pcpn_typ/ows?service=WMS&version=1.3.0&request=GetFeatureInfo&layers=conus_pcpn_typ&query_layers=conus_pcpn_typ&crs=EPSG:4326&bbox="+[lat-d,lon-d,lat+d,lon+d].join(",")+"&width=101&height=101&i=50&j=50&info_format=application/json";
+    const j=await fetch(u,{signal:ac.signal}).then(r=>r.ok?r.json():null); clearTimeout(to);
+    const p=j&&j.features&&j.features[0]&&j.features[0].properties;
+    if(p) v=(p.ALPHA_BAND||0)<128?"none":(rdIsSnow([p.RED_BAND,p.GREEN_BAND,p.BLUE_BAND],0)?"snow":"other"); }catch(e){ v=null; }
+  TYPE_AT.set(key,{at:Date.now(),v:v}); return v; }
+async function stationType(s){
+  const L=s.latest; if(statusOf(s).cls!=="ok"||L.temp==null||L.temp>34) return null;
+  return typeAt(s.lat,s.lon); }
+/* Fog from the station's own readings (it has no visibility sensor). Tested 2026-11-22 against airport fog reports (Oct 15 to Nov 20, 3 stations, 35 fog events): FOG = dew point within 2F of the temperature, humidity 96 or more, wind 5 or less; MIST = within 3F, humidity 93 or more, wind 7 or less. Both need no rain and must hold for the last 30 minutes of readings we have. The mist rule caught 33 of 35 airport fogs; nearly all its extra episodes lined up with airport mist reports (3 of 76 had neither). */
+function stationDewSpread(t,h){ if(t==null||h==null||h<=0) return null; const c=(t-32)/1.8, g=(17.62*c)/(243.12+c)+Math.log(Math.min(h,100)/100); return t-((243.12*g/(17.62-g))*1.8+32); }
+function stationFog(s){
+  const L=s.latest; if(statusOf(s).cls!=="ok"||L.temp==null||L.hum==null||L.wind==null||(+L.rainRate||0)>0||stationRain(s)) return null;
+  const rows=[[L.temp,L.hum,+L.wind||0,+L.rainRate||0]]; (s.recent||[]).forEach(r=>{ if(r[0]>=L.epoch-1800&&r[0]<L.epoch) rows.push([r[1],r[3],+r[4]||0,+r[7]||0]); });
+  const ok=(sp,h,w)=>rows.every(r=>{ const d=stationDewSpread(r[0],r[1]); return d!=null&&d<=sp&&r[1]>=h&&r[2]<=w&&r[3]===0; });
+  if(ok(2,96,5)) return {lvl:2,words:"Fog"}; if(ok(3,93,7)) return {lvl:1,words:"Mist"}; return null; }
+/* Fog, mist, haze or smoke the nearest airport reports while this station does not look foggy: shown as "nearby". */
+function stationAirFog(o){
+  const f=cvFogOf({txt:o.txt}); if(!f) return null;
+  const nm=f.tone==="smoke"?"Smoke":(f.tone==="haze"?"Haze":(f.lvl===3?"Dense fog":(f.lvl===1?"Mist":"Fog")));
+  return {lvl:f.lvl,tone:f.tone,words:nm+"\nnearby ("+o.id+")"}; }
+function stationSky(s,mode,o,ty){
+  const hz={wind:null,fog:null,storm:null,snowDepth:0,wet:null,terrain:s.terrain||"flat",water:s.water||null,pop:s.pop>0?s.pop:null};
+  const L0=s.latest; let slant=0;
+  if(statusOf(s).cls==="ok"&&L0.wind!=null){ const ws=+L0.wind||0, dr=(L0.dir==null||isNaN(+L0.dir))?null:+L0.dir; hz.wind={ws:ws,wg:Math.max(ws,+L0.gust||0),dir:dr}; if(dr!=null) slant=Math.sin(dr*Math.PI/180)*Math.min(1,ws/40)*0.9; }
+  let lv=0, words="";
+  if(mode==="air"&&o){ lv=o.lv; words=(skyLevelWords(o.txt)!=null&&!STAIR_PRECIP.test(o.txt))?o.txt:""; }
+  else { const h=stationFcHour(s), txt=h?String(h.text||""):"";
+    lv=skyLevelWords(txt); if(lv==null&&/rain|shower|drizzle|snow|flurr|sleet|freezing|thunder|storm/i.test(txt)) lv=4; lv=lv||0;
+    if(mode==="fc"&&txt) words=(txt+" (forecast)").slice(0,48); }
+  const aw=(mode==="air"&&o)?stationAirWet(o):null, rw=stationRain(s), tNow=(statusOf(s).cls==="ok")?L0.temp:null;
+  const setW=(type,lvl,shower,bz)=>{ hz.wet={type:type,lvl:lvl,shower:!!shower,bz:bz||0,slant:slant}; };
+  let radarSnow=false;
+  /* order: gauge rain (unless the airport reports snow, ice or mix and it is 36F or colder here, since the gauge cannot tell the type), then any airport precipitation words, then radar-type snow when it is 34F or colder */
+  if(rw){ if(aw&&aw.type!=="rain"&&tNow!=null&&tNow<=36){ setW(aw.type,aw.lvl,aw.shower,aw.bz); lv=5; words=aw.name; } else { setW("rain",rw.lvl,false,0); lv=5; words=rw.words; } }
+  else if(aw){ setW(aw.type,aw.lvl,aw.shower,aw.bz); lv=Math.max(lv,aw.min||0); words=aw.words; }
+  else if(ty==="snow"&&tNow!=null&&tNow<=34){ setW("snow",1,false,0); lv=5; words="Light snow\nnearby (radar)"; radarSnow=true; }
+  const fg=stationFog(s), af=(!fg&&mode==="air"&&o)?stationAirFog(o):null;
+  if(fg){ hz.fog={lvl:fg.lvl,tone:"fog"}; lv=Math.max(lv,fg.lvl>=2?5:4); if(!hz.wet) words=fg.words; }
+  else if(af){ hz.fog={lvl:af.lvl,tone:af.tone}; if(!hz.wet) words=af.words; }
+  if(mode!=="wait") s._snowFx=(hz.wet&&hz.wet.type==="snow")?hz.wet.lvl:0;   /* tells the moving-snow layer what to draw */
+  const bnr=skyBanner(s.label,words,s.lat,s.lon,Date.now(),lv,"",hz); bnr._radarSnow=radarSnow; return bnr; }
 function stationHead(s){
-  const c=card("st"); c.style.setProperty("--c",color[s.id]);
+  const c=card("st"); c.style.setProperty("--c",color[s.id]); c.classList.add("cvfx");   /* moving rain and wind draw over the banner, as on a custom place */
   const L=s.latest;
-  const row=el("div","row"); row.appendChild(el("div","name",s.label)); const hp=el("span","pill"); row.appendChild(hp); c.appendChild(row);
+  let bn=stationSky(s,"wait"); c.appendChild(bn); if(skySt&&SKY_RO) SKY_RO.unobserve(skySt); skySt=bn; if(SKY_RO) SKY_RO.observe(bn);
+  const row=el("div","row"); const hp=el("span","pill"); row.appendChild(hp); c.appendChild(row);
+  const skyNote=el("div","note",""); skyNote.style.display="none"; c.appendChild(skyNote);
+  const skyApply=async()=>{
+    let o=null, ty=null; try{ [o,ty]=await Promise.all([stationAir(s).catch(()=>null),stationType(s).catch(()=>null)]); }catch(e){}
+    if(!bn.isConnected) return;
+    const nb=stationSky(s,o?"air":"fc",o,ty);
+    if(SKY_RO) SKY_RO.unobserve(bn); c.replaceChild(nb,bn); bn=nb; skySt=nb; if(SKY_RO) SKY_RO.observe(nb);
+    skyNote.textContent=o?("Sky from "+o.id+" ("+o.name+"), "+o.d.toFixed(1)+" mi away, reported "+(o.age<1?"just now":Math.round(o.age)+" min ago")+"."):"No fresh airport sky report (nothing newer than 75 minutes), so the sky follows the forecast for this hour.";
+    const aw2=o?stationAirWet(o):null, wint=!!(aw2&&aw2.type!=="rain"&&(!stationRain(s)||L.temp<=36));
+    if(wint) skyNote.textContent+=" The precipitation picture follows that airport report (this station's rain gauge can't see snow or ice).";
+    else if(stationRain(s)) skyNote.textContent+=" The rain shown comes from this station's own rain gauge.";
+    else if(aw2) skyNote.textContent+=" The rain picture follows that airport report until this station's own rain gauge reads rain.";
+    if(nb._radarSnow) skyNote.textContent+=" The snow comes from NOAA's radar precipitation-type layer at this spot, and it is cold here. Radar can miss light snow.";
+    if(stationFog(s)) skyNote.textContent+=" The fog is worked out from this station's humidity, dew point and wind (it has no visibility sensor).";
+    else if(o&&stationAirFog(o)) skyNote.textContent+=" The fog picture follows that airport report.";
+    skyNote.style.display=""; };
+  setTimeout(skyApply,0); const skyIv=setInterval(()=>{ if(!bn.isConnected){ clearInterval(skyIv); return; } skyApply(); },300000);
   const updHead=()=>{ const st=statusOf(s); hp.className="pill "+st.cls; hp.textContent=st.txt+" · "+ageText(Math.max(0,st.age))+" · last reading "+hhmm(L.epoch,s.tz)+" "+zoneAbbr(L.epoch,s.tz); };
   updHead(); UPDATERS.push(updHead);
   c.appendChild(el("div","note","Click a tile to open its deep dive."));
@@ -1796,7 +1902,7 @@ function skyMoonPath(x,y,r,p){                                /* only the lit pa
   return p<0.5?"M"+x+" "+(y-r)+"A"+r+" "+r+" 0 0 1 "+x+" "+(y+r)+"A"+k+" "+r+" 0 0 "+(p<0.25?0:1)+" "+x+" "+(y-r)
               :"M"+x+" "+(y-r)+"A"+r+" "+r+" 0 0 0 "+x+" "+(y+r)+"A"+k+" "+r+" 0 0 "+(p>0.75?1:0)+" "+x+" "+(y-r); }
 /* The banner is drawn at the card's real width (one picture unit = one screen pixel), and drawn again when the width changes, so nothing is stretched or cropped on a phone or a wide screen. */
-const SKY_RO=window.ResizeObserver?new ResizeObserver(es=>es.forEach(e=>{ const b=e.target, w=Math.round(e.contentRect.width); if(b._fill&&w>=100&&Math.abs(w-b._w)>1) b._fill(w); })):null;
+const SKY_RO=window.ResizeObserver?new ResizeObserver(es=>es.forEach(e=>{ const b=e.target, w=Math.round(e.contentRect.width); if(b._nm&&w>=100) b._nm(w); if(b._fill&&w>=100&&Math.abs(w-b._w)>1) b._fill(w); })):null;
 /* ---- B3: how cloudy. Five levels that follow the National Weather Service bands (0 to 12.5%, 12.5 to 37.5%, 37.5 to 62.5%, 62.5 to 87.5%, 87.5 to 100% of the sky). The level comes from the weather words first, then the NWS sky cover percentage for this hour, then the forecast model's cloud cover. 0 means no information: no clouds are drawn. ---- */
 const SKY_COV=[0.05,0.25,0.5,0.75,1];
 const SKY_K=[0,1.6,1.5,2.0,2.2];     /* tuned so the drawn clouds cover about 5, 25, 50, 75 and 100% of the cloud band, the top 72 px of the sky (measured on the picture) */
@@ -2290,7 +2396,10 @@ function skyBanner(name,words,lat,lon,ms,lv,tag,hz){
     if(hz&&hz.storm&&hz.storm.tier>0){ const sdf=mk(svg,"defs",{}), sgd=mk(sdf,"linearGradient",{id:uid+"stm",x1:0,y1:0,x2:0,y2:1}); [[0,0.34],[0.6,0.2],[1,0]].forEach(a=>mk(sgd,"stop",{offset:a[0],"stop-color":"rgb(16,20,34)","stop-opacity":a[1]})); mk(svg,"rect",{x:0,y:0,width:W,height:HZ+6,fill:"url(#"+uid+"stm)",opacity:0.55+0.45*d}); }
   };
   wrap._fill(680);
-  wrap.appendChild(svg); wrap.appendChild(el("div","skyn",name)); wrap.appendChild(el("div","skyw",words||""));
+  const nmE=el("div","skyn",name), nmP=/^(.+?)\s*\((.+)\)\s*$/.exec(name||"");
+  /* A name like "Champs de Lafayette (Fort Wayne, IN)": on one line keep the brackets; if it has to wrap, split it into the name and "Fort Wayne, IN" with no brackets. */
+  wrap._nm=function(w){ if(!nmP) return; nmE.style.whiteSpace="nowrap"; nmE.style.maxWidth="none"; nmE.textContent=name; const fits=nmE.getBoundingClientRect().width<=w*0.55-2; nmE.style.whiteSpace=""; nmE.style.maxWidth=""; if(fits) return; nmE.textContent=""; nmE.appendChild(el("div",null,nmP[1])); nmE.appendChild(el("div",null,nmP[2])); };
+  wrap.appendChild(svg); wrap.appendChild(nmE); wrap.appendChild(el("div","skyw",words||""));
   if(hz&&hz.storm){ const sa2=skyPos(ms,lat,lon).sun.alt; skyFlash(wrap,hz.storm,Math.max(0,Math.min(1,(sa2+6)/14))); }
   return wrap; }
 /* Rain and wind effects for a custom place. There is no rain gauge, so rain comes from the weather words (station text, else the first hour of the forecast, else the model). "Chance of" does not count. Wind uses the station-page rules. A reading more than 60 minutes old turns everything off. */
@@ -2391,8 +2500,17 @@ function customView(){
     const hi=hist&&hist.hi!==null?Math.max(hist.hi,r.t):null, lo=hist&&hist.lo!==null?Math.min(hist.lo,r.t):null;
     const cs={id:"__cv",tz,label:curPl.title,snowIn:pr?pr.snow:null,cvFx:cvFxFor(r),latest:{temp:r.t,feels:cvFeels(r.t,r.w,r.rh),hum:r.rh,wind:r.w,dir:r.dir,gust:(r.g!==null&&r.g!==undefined&&Math.round(r.g)>Math.round(r.w))?r.g:null,press:r.pr,todayHi:hi,todayLo:lo,rainToday:pr?pr.rain:null}};
     const L=cs.latest, c=card("st"); c.style.setProperty("--c","var(--mute)"); c.classList.add("cvfx");
-    const tc0=cvTerrCached(curPl.lat,curPl.lon), hz={wind:cvWindFx(r),fog:cvFogOf(r),storm:cvStormOf(r),snowDepth:(pr&&typeof pr.depth==="number")?pr.depth:0,wet:cvWetFx(r),terrain:tc0?tc0.t:"flat",water:tc0?tc0.w:null,pop:curPl.pop>0?curPl.pop:cvPopCached(curPl)}, wet=cvWetOf(r), lv0=r.sky?r.sky.lv:skyLevelWords(r.txt), bn=skyBanner(curPl.title,((r.txt||"")+(r.txtSrc==="forecast"?" (forecast)":"")).slice(0,48),curPl.lat,curPl.lon,Date.now(),wet?Math.max(lv0||0,wet.min):lv0,r.sky&&r.sky.src==="model"?"modeled":"",hz);
+    let tc0=cvTerrCached(curPl.lat,curPl.lon), hz={wind:cvWindFx(r),fog:cvFogOf(r),storm:cvStormOf(r),snowDepth:(pr&&typeof pr.depth==="number")?pr.depth:0,wet:cvWetFx(r),terrain:tc0?tc0.t:"flat",water:tc0?tc0.w:null,pop:curPl.pop>0?curPl.pop:cvPopCached(curPl)}, wet=cvWetOf(r), lv0=r.sky?r.sky.lv:skyLevelWords(r.txt), bn=skyBanner(curPl.title,((r.txt||"")+(r.txtSrc==="forecast"?" (forecast)":"")).slice(0,48),curPl.lat,curPl.lon,Date.now(),wet?Math.max(lv0||0,wet.min):lv0,r.sky&&r.sky.src==="model"?"modeled":"",hz);
     c.appendChild(bn);
+    /* Radar snow, same rule as a station: nothing falling is reported here, it is 34F or colder, and NOAA's precipitation-type layer reads snow at this spot. Drawn after the banner is already up, so nothing waits on it. */
+    if(!hz.wet&&r.t!=null&&r.t<=34){ const latS=curPl.lat, lonS=curPl.lon;
+      typeAt(latS,lonS).then(ty=>{ if(ty!=="snow"||!bn.isConnected||curPl.lat!==latS||curPl.lon!==lonS||hz.wet) return;
+        const sx=r.dir==null||isNaN(+r.dir)?0:Math.sin(+r.dir*Math.PI/180);
+        hz.wet={type:"snow",lvl:1,shower:false,bz:0,slant:sx*Math.min(1,(+r.w||0)/40)*0.9}; cs.cvFx.snow=1; cs.cvFx.pt="s"; cs.cvFx.sshower=false; cs.cvFx.bz=0; cs.cvFx.rain=false;
+        const nb=skyBanner(curPl.title,"Light snow (radar)",curPl.lat,curPl.lon,Date.now(),5,r.sky&&r.sky.src==="model"?"modeled":"",hz);
+        if(SKY_RO) SKY_RO.unobserve(bn); c.replaceChild(nb,bn); bn=nb; skyCur=nb; if(SKY_RO) SKY_RO.observe(nb);
+        if(srcNote) srcNote.textContent+=" The snow shown comes from NOAA's radar precipitation-type layer at this spot, and it is cold here. Radar can miss light snow.";
+        if(FX_ON) fxKick(); }); }
     if((hz.wet&&hz.wet.type==="rain")||(hz.storm&&hz.storm.tier>0)){ const w0=hz.wet, s0=hz.storm, lat0=curPl.lat, lon0=curPl.lon;
       cvRadar(lat0,lon0).then(rd=>{ if(!rd||!bn._w||!bn.isConnected||curPl.lat!==lat0||curPl.lon!==lon0) return; let ch=false;
         if(w0&&w0.type==="rain"){ const nl=Math.max(1,Math.min(4,w0.lvl+Math.max(-1,Math.min(1,cvRadarLvl(Math.max(rd.mm,rd.max*0.6))-Math.min(3,w0.lvl))))); if(nl!==w0.lvl&&w0.lvl<=3){ w0.lvl=nl; cs.cvFx.t=[0.3,0.5,0.8,0.95][nl-1]; ch=true; } }
@@ -2409,7 +2527,7 @@ function customView(){
       const age=r.age<1?"just now":Math.round(r.age)+" min ago";
       src=r.n===1?"Station "+r.near.id+" ("+r.near.name+"), "+r.near.d.toFixed(1)+" mi away, reported "+age+".":r.n+" stations, "+r.dmin.toFixed(1)+" to "+r.dmax.toFixed(1)+" mi away, "+(Math.round(r.tmin)===Math.round(r.tmax)?"all "+Math.round(r.tmin):Math.round(r.tmin)+" to "+Math.round(r.tmax))+"°F, showing the middle reading. Nearest: "+r.near.id+" ("+r.near.name+"). Newest report "+age+".";
     } else src="Modeled for this spot, not measured. No nearby station had a fresh reading.";
-    c.appendChild(el("div","note",(r.txt?r.txt+". ":"")+src));
+    const srcNote=el("div","note",(r.txt?r.txt+". ":"")+src); c.appendChild(srcNote);
     if(r.kind==="stations"&&r.age>60) c.appendChild(el("div","note cvlate","NWS airport data is running late."));
     const tiles=el("div","tiles");
     const trend=(hist&&hist.ago!==null)?Math.round(r.t-hist.ago):null;
@@ -2652,7 +2770,10 @@ function init(){
   window.addEventListener("popstate",()=>{ state.station="all"; state.metric="temp"; readHash(); sel.value=state.station; if(state.range==="custom"){ dFrom.value=state.from; dTo.value=state.to; } mk(); status(); closeDates(); if(phone()) closePanel(); render(); window.scrollTo(0,0); });
   mk();
   document.getElementById("stationsLine").textContent=ST.map(short).join(" · ");
-  document.getElementById("foot").textContent="Data provided by Weather Underground (personal weather stations), history collected every 15 minutes by wu_collect.py and saved in monthly CSV files, plus a live reading every 5 minutes for the Right now cards. Forecast: National Weather Service. Alerts: National Weather Service (api.weather.gov), checked every 5 minutes for each station's chosen address by wx_alerts.py. Pressure is the average of each 5-minute min and max, so it is rounded to 0.1 in. Right now cards use a live reading when it is newer than the saved history. Page built "+stamp(BUILT)+" "+zoneAbbr(BUILT)+" · history saved since "+((d)=>{const p=d.split("-"); return (+p[1])+"/"+(+p[2]);})(DATA.start)+".";
+  const FOOT=document.getElementById("foot"); FOOT.textContent="Data provided by Weather Underground (personal weather stations), history collected every 15 minutes by wu_collect.py and saved in monthly CSV files, plus a live reading every 5 minutes for the Right now cards. Forecast: National Weather Service. Alerts: National Weather Service (api.weather.gov), checked every 5 minutes for each station's chosen address by wx_alerts.py. Pressure is the average of each 5-minute min and max, so it is rounded to 0.1 in. Right now cards use a live reading when it is newer than the saved history. Page built "+stamp(BUILT)+" "+zoneAbbr(BUILT)+" · history saved since "+((d)=>{const p=d.split("-"); return (+p[1])+"/"+(+p[2]);})(DATA.start)+".";
+  { const A=(t,u)=>{ const a=document.createElement("a"); a.textContent=t; a.href=u; a.target="_blank"; a.rel="noopener"; return a; }, cr=document.createElement("p"); cr.style.marginTop="10px";
+    [ "Credits: weather data by ",A("Open-Meteo.com","https://open-meteo.com/")," (",A("CC BY 4.0","https://creativecommons.org/licenses/by/4.0/"),"). Place search and map data © ",A("OpenStreetMap contributors","https://www.openstreetmap.org/copyright")," (ODbL), map tiles by ",A("CARTO","https://carto.com/attributions"),". Radar from the ",A("Iowa Environmental Mesonet","https://mesonet.agron.iastate.edu/")," (NWS NEXRAD), with rainfall and precipitation type from NOAA MRMS and HRRR, and ",A("RainViewer","https://www.rainviewer.com/")," as a backup. Observations, forecasts and alerts: the ",A("National Weather Service","https://www.weather.gov/"),". Town sizes: ",A("U.S. Census Bureau","https://www.census.gov/programs-surveys/popest.html")," population estimates. Address lookup: U.S. Census Geocoder. ZIP lookup: ",A("Zippopotam.us","https://zippopotam.us/"),". Airport list: ",A("OurAirports","https://ourairports.com/data/")," (public domain). Code libraries: Leaflet (BSD 2-Clause), Lucide (ISC) and polygon-clipping (MIT, Mike Fogel, from martinez by Alexander Milevski)." ].forEach(x=>cr.appendChild(typeof x==="string"?document.createTextNode(x):x));
+    FOOT.appendChild(cr); }
   const view=restoreView(); CV_RESTORE=(view&&view.c&&typeof view.c.lat==="number"&&typeof view.c.lon==="number"&&view.c.label)?view.c:null;
   initRefresh();
   render();
@@ -2725,7 +2846,7 @@ function initAutoUpdate(){
         saveView();
         /* Reload to an address with the build time on it (?v=...). The browser has never seen that address, so it has to fetch a fresh
            copy of the page instead of handing back the cached one. The #station=... part is kept, so the view stays put. */
-        location.replace(location.pathname+"?v="+encodeURIComponent(m.built)+(CUSTOM_ON?"&custom=1":"")+location.hash);
+        location.replace(location.pathname+"?v="+encodeURIComponent(m.built)+location.hash);
         return;
       }
       if(newer&&busyUI()) note("newer data waiting, a menu is open");

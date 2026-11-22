@@ -227,6 +227,7 @@ def station_block(st, rows, snow_days=None):
         "todayGust": max([r["g"] for r in trows if r["g"] is not None], default=None),
     }
     return {"id": st["id"], "label": st["label"], "lat": last["lat"], "lon": last["lon"], "tz": last["tz"],
+            "terrain": st.get("terrain"), "water": st.get("water"), "pop": st.get("pop"), "air": st.get("air"),   # stored by station_terrain.py, used by the sky banner
             "first": rows[0]["loc"], "count": len(rows),
             "latest": latest, "daily": daily, "hourly": hourly, "recent": recent,
             "gaps": gaps, "gapMinutes": sum(g["min"] for g in gaps),
