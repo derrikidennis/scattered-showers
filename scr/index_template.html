@@ -90,16 +90,24 @@ th:first-child,td:first-child{text-align:left}
 th{color:var(--mute);font-weight:600;position:sticky;top:0;background:var(--card)}
 .scroll{overflow:auto;max-height:340px}
 .fc{grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
-.hr{display:flex;gap:2px;overflow-x:auto;padding:12px 8px 10px;background:var(--card);border-radius:12px;cursor:grab;scrollbar-width:thin;scrollbar-color:var(--line) transparent;overscroll-behavior-x:contain}
+.hr{display:flex;overflow-x:auto;padding:12px 8px 10px;background:var(--card);border-radius:12px;cursor:grab;scrollbar-width:thin;scrollbar-color:var(--line) transparent;overscroll-behavior-x:contain}
 .hr.drag{cursor:grabbing;user-select:none}
-.hr .h{flex:0 0 66px;text-align:center;padding:4px 0;border-radius:8px}
-.hr .h.day{border-left:1px solid var(--line);margin-left:4px;padding-left:4px}
+.hr .hrin{position:relative;flex:0 0 auto}
+.hr .hrl{position:absolute;left:0;top:0}
+.hr .h{position:absolute;top:0;bottom:0;width:66px;text-align:center}
 .hr .t{font-size:12.5px;color:var(--mute);white-space:nowrap}
 .hr .day .t{color:var(--ink);font-weight:650}
-.hr .ic{display:block;width:34px;height:34px;margin:4px auto}
-.hr .v{font-size:17px;font-weight:400}
-.hr .p{font-size:12px;color:var(--cool);min-height:16px}
-.hr .w{font-size:11.5px;color:var(--mute);white-space:nowrap}
+.hr .ic{position:absolute;left:16px;width:34px;height:34px;margin:0}
+.hr .v,.hr .p,.hr .w{position:absolute;left:0;right:0}
+.hr .v{font-size:17px;font-weight:500}
+.hr .p{font-size:12px;font-weight:500}
+.hr .wnd{position:absolute;left:0;width:66px;height:34px;overflow:visible;pointer-events:none}
+.hr .wl{animation:hr-gust 1.7s ease-in-out infinite}
+.hr .wl.we{animation-name:hr-gust-e}
+@keyframes hr-gust{0%{transform:translateX(-3px);opacity:0}30%{opacity:1}100%{transform:translateX(5px);opacity:0}}
+@keyframes hr-gust-e{0%{transform:translateX(3px);opacity:0}30%{opacity:1}100%{transform:translateX(-5px);opacity:0}}
+.still .hr .wl{animation:none}
+@media (prefers-reduced-motion:reduce){.hr .wl{animation:none}}
 .fc .d{font-weight:650}
 .fc .hl{font-size:22px;font-weight:300;margin:4px 0}
 .fc .hl small{color:var(--mute);font-size:15px}
@@ -992,7 +1000,8 @@ function arcPath(cx,cy,r,f0,f1){ const a=arcPt(cx,cy,r,f0), b=arcPt(cx,cy,r,f1);
 function gzSvg(label){ const g=sv("svg",{viewBox:"0 0 120 84",class:"gz",role:"img","aria-label":label}); return g; }
 /* Dial, gauge and icon colors. Dark values are the originals. Light values are deeper so they read on white; the dial green and red match the station green and red. */
 const RAIN_BLUE=IS_LIGHT?"#0284c7":"#82e2ff", DIAL_DOT=IS_LIGHT?"#0F172A":"#edecee", DIAL_RING=IS_LIGHT?"#ffffff":"#232230", NEEDLE=IS_LIGHT?"#d13b3b":"#ff6767";
-const TEMP_STOPS=IS_LIGHT?[[0,"#0284c7"],[0.42,"#0e9373"],[0.7,"#d97706"],[1,"#d13b3b"]]:[[0,"#82e2ff"],[0.42,"#61ffca"],[0.7,"#ffca85"],[1,"#ff6767"]];
+/* Colors by temperature (2026-11-22): violet under 10, indigo 10-25, blue 25-40, blue-green 40-50, green 50-60, yellow 60-75, orange 75-90, red 90 and up. Offsets are (temp + 20) / 140. Light mode has a lime stop at 61 so the green-to-gold blend never turns olive-brown. */
+const TEMP_STOPS=IS_LIGHT?[[0.0,"#7c3aed"],[0.1786,"#7c3aed"],[0.2643,"#4f46e5"],[0.3714,"#1d7fd8"],[0.4643,"#0d9488"],[0.5357,"#16a34a"],[0.5786,"#7fb320"],[0.6214,"#c99a00"],[0.7286,"#ea6a0a"],[0.8214,"#d13b3b"],[1.0,"#d13b3b"]]:[[0.0,"#b08cff"],[0.1786,"#b08cff"],[0.2643,"#7f8dff"],[0.3714,"#5fb0ff"],[0.4643,"#4fe0d0"],[0.5357,"#6ff0a0"],[0.6214,"#ffe066"],[0.7286,"#ffa24d"],[0.8214,"#ff5f5f"],[1.0,"#ff5f5f"]];
 const IC_LIGHT={"#ffca85":"#f59e0b","#d9d6ec":"#7b8bbd","#c9c6d8":"#94a3b8","#9b98b0":"#64748b","#8f8ca3":"#64748b","#b5b2c4":"#94a3b8","#7e7b94":"#475569","#82e2ff":"#0284c7","#edecee":"#94a3b8"};
 const ic=h=>IS_LIGHT?(IC_LIGHT[h.toLowerCase()]||h):h;                       /* weather icon colors: dark = as drawn, light = deeper swap */
 function mixHex(a,b,t){ const p=h=>[1,3,5].map(i=>parseInt(h.slice(i,i+2),16)); const x=p(a), y=p(b); return "#"+x.map((v,i)=>Math.round(v+(y[i]-v)*t).toString(16).padStart(2,"0")).join(""); }
@@ -1301,28 +1310,48 @@ function hourlySection(s,hsIn){
   const hs=hsIn||((DATA.hourly||{})[s.id]||{}).hours||[];
   const now=Date.now(), list=hs.filter(h=>new Date(h.t).getTime()+3600000>now).slice(0,48);
   if(!list.length) return null;
-  const strip=el("div","hr"); strip.setAttribute("aria-label","Hourly forecast, scroll sideways");
+  const strip=el("div","hr"); strip.setAttribute("aria-label","Hourly forecast as a temperature line, scroll sideways");
   const DN=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+  /* A line of temperature: icon above each point, the temperature and rain chance below it, both in the color the Temperature gauge would show for that number. The line is a gradient through those colors. Scaled to the range in view, but never flatter than 12 degrees of span, so a steady day stays a calm line. */
+  const CW=66, TOP=24, BAND=56, ICON=34, temps=list.map(h=>h.temp), tn=Math.min.apply(null,temps), tx=Math.max.apply(null,temps);
+  const span=Math.max(12,tx-tn), mid=(tx+tn)/2, lo=mid-span/2, W=list.length*CW, Hh=TOP+ICON+14+BAND+66;
+  const yOf=t=>TOP+ICON+14+(1-(t-lo)/span)*BAND, xOf=i=>i*CW+CW/2;
+  /* Windy hours: 15 mph sustained or more switches the streaks on, and they stay on until it drops under 13 (the station banners use the same two numbers). The hourly feed gives a range such as "10 to 15 mph"; we use the top of it. Gusts are not in this feed. */
+  const windy=[]; let wOn=false; list.forEach((h,i)=>{ const w=h.wind==null?0:h.wind; if(w>=15) wOn=true; else if(w<13) wOn=false; windy[i]=wOn; });
+  const inner=el("div","hrin"); inner.style.width=W+"px"; inner.style.height=Hh+"px";
+  const svg=sv("svg",{width:W,height:Hh,viewBox:"0 0 "+W+" "+Hh,class:"hrl","aria-hidden":"true"});
+  const gid="hg"+Math.random().toString(36).slice(2,7), df=sv("defs",{}), lg=sv("linearGradient",{id:gid,gradientUnits:"userSpaceOnUse",x1:xOf(0),y1:0,x2:xOf(list.length-1)+0.01,y2:0});
+  list.forEach((h,i)=>lg.appendChild(sv("stop",{offset:list.length>1?i/(list.length-1):0,"stop-color":tempColor(h.temp)}))); df.appendChild(lg); svg.appendChild(df);
+  const pts=list.map((h,i)=>[xOf(i),yOf(h.temp)]);
+  let d="M"+pts[0][0]+" "+pts[0][1];
+  for(let i=1;i<pts.length;i++){ const a=pts[i-1], b=pts[i], cx=(a[0]+b[0])/2; d+=" C"+cx+" "+a[1]+" "+cx+" "+b[1]+" "+b[0]+" "+b[1]; }
+  list.forEach((h,i)=>{ const hr=+h.t.slice(11,13); if(hr===0&&i>0) svg.appendChild(sv("line",{x1:i*CW,x2:i*CW,y1:6,y2:Hh-6,stroke:"var(--line)","stroke-width":1})); });
+  svg.appendChild(sv("path",{d:d,fill:"none",stroke:"url(#"+gid+")","stroke-width":3.2,"stroke-linecap":"round","stroke-linejoin":"round"}));
+  list.forEach((h,i)=>svg.appendChild(sv("circle",{cx:pts[i][0],cy:pts[i][1],r:3.6,fill:tempColor(h.temp),stroke:"var(--card)","stroke-width":1.6})));
+  inner.appendChild(svg);
   list.forEach((h,i)=>{
-    const hr=+h.t.slice(11,13), isMid=hr===0;
-    const x=el("div","h"+((isMid||i===0)&&i>0?" day":""));
+    const hr=+h.t.slice(11,13), isMid=hr===0, y=pts[i][1], col=tempColor(h.temp);
+    const x=el("div","h"+((isMid||i===0)&&i>0?" day":"")); x.style.left=(i*CW)+"px";
     /* when clocks fall back, one hour shows twice in a row: name the zone on both (1 AM EDT, 1 AM EST) */
     const twice=(list[i-1]&&+list[i-1].t.slice(11,13)===hr)||(list[i+1]&&+list[i+1].t.slice(11,13)===hr);
     const lab=(isMid&&i>0)?DN[new Date(h.t.slice(0,10)+"T12:00:00Z").getUTCDay()]:(i===0?"Now":(hr%12||12)+(hr<12?" AM":" PM")+(twice?" "+zoneAbbr(new Date(h.t).getTime()/1000,s.tz):""));
-    x.appendChild(el("div","t",lab)); x.title=h.text||"";
-    x.appendChild(wxIcon(h.kind));
-    x.appendChild(el("div","v",fmt0(h.temp)+"°"));
-    x.appendChild(el("div","p",h.pop>=10?h.pop+"%":""));
-    x.appendChild(el("div","w",h.wind==null?"":h.wind+" mph "+(h.dir||"")));
-    strip.appendChild(x);
+    x.appendChild(el("div","t",lab)); x.title=(h.text||"")+(h.wind!=null?" · wind "+h.wind+" mph "+(h.dir||""):"");
+    const ico=wxIcon(h.kind); ico.style.top=(y-ICON-10)+"px"; x.appendChild(ico);
+    const v=el("div","v",fmt0(h.temp)+"°"); v.style.top=(y+9)+"px"; v.style.color=col; x.appendChild(v);
+    if(h.pop>=10){ const p=el("div","p",h.pop+"%"); p.style.top=(y+31)+"px"; p.style.color=col; x.appendChild(p); }
+    if(windy[i]){ const east=/E/.test(h.dir||"")&&!/W/.test(h.dir||""), wsvg=sv("svg",{viewBox:"0 0 66 34",class:"wnd","aria-hidden":"true"});   /* streaks on the downwind side: wind from the east blows left, anything else blows right */
+      [[10,9],[17,13],[24,8]].forEach(([yy,ln],k)=>{ const x0=east?14:52, x1=east?14-ln:52+ln; wsvg.appendChild(sv("line",{class:"wl"+(east?" we":""),style:"animation-delay:"+(-k*0.55)+"s",x1:x0,y1:yy,x2:x1,y2:yy,stroke:IS_LIGHT?"#64748b":"#b5b2c4","stroke-width":2.3,"stroke-linecap":"round"})); });
+      wsvg.style.top=(y-ICON-10)+"px"; x.appendChild(wsvg); }
+    inner.appendChild(x);
   });
+  strip.appendChild(inner);
   /* mouse drag; touch screens already swipe on their own */
   let down=false,sx=0,sl=0;
   strip.addEventListener("pointerdown",e=>{ if(e.pointerType!=="mouse") return; down=true; sx=e.clientX; sl=strip.scrollLeft; strip.classList.add("drag"); strip.setPointerCapture(e.pointerId); });
   strip.addEventListener("pointermove",e=>{ if(down) strip.scrollLeft=sl-(e.clientX-sx); });
   const up=()=>{ down=false; strip.classList.remove("drag"); };
   strip.addEventListener("pointerup",up); strip.addEventListener("pointercancel",up);
-  return section("Hourly",strip,"Next 48 hours from the National Weather Service. Drag or swipe sideways for more. The daily forecast below is from the National Weather Service too.");
+  return section("Hourly",strip,"Next 48 hours from the National Weather Service. The line and the numbers use the same colors as the Temperature gauge. Moving streaks beside an icon mean wind of 15 mph or more that hour; hover (or press and hold) an hour for the speed. Drag or swipe sideways for more. The daily forecast below is from the National Weather Service too.");
 }
 function radarSection(s,ext){
   if(typeof L==="undefined") return section("Radar",el("div","note","The map library did not load, so there is no radar on this page."));
