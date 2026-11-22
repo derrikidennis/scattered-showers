@@ -192,6 +192,7 @@ def approved():
         if p.is_file():
             add(p, f"scr/vendor/lucide/{p.name}")
     add(BASE / "requirements.txt", "requirements.txt")
+    add(BASE / "md" / "CHANGELOG.md", "CHANGELOG.md")                 # what changed in each version (written in md\\CHANGELOG.md, copied to the repo root)
     add(BASE / "md" / "README.md", "README.md")                       # the repo front page (written in md\\README.md, copied to the repo root)
     add(SRC / "docx" / "Scattered_Showers_Guide.html", "docx/Scattered_Showers_Guide.html")
     for p in sorted((SRC / "docx" / "img").glob("*.png")):

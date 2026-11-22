@@ -4,6 +4,8 @@ A homemade weather dashboard for three backyard weather stations. One HTML page,
 
 **Live page: https://derrikidennis.github.io/scattered-showers/**
 
+Version 1.1.0 (2026-11-22). What changed: [CHANGELOG.md](CHANGELOG.md).
+
 ![The Scattered Showers dashboard in dark mode, showing current conditions and a 5-day forecast for three stations](docx/img/Scattered_Showers_Screenshot.png)
 
 The stations are Acurite personal weather stations in Fort Wayne (Indiana), Elgin (Texas) and Kingsburg (California). The page works as a normal website and also installs to a phone or tablet home screen.
@@ -12,7 +14,7 @@ The stations are Acurite personal weather stations in Fort Wayne (Indiana), Elgi
 
 - A card per station with current temperature, wind, humidity, pressure and rain, and a gauge view when you pick one station
 - History charts, each with a Chart/Table switch if you'd rather read numbers
-- A 5-day forecast for each station, plus a scrolling hourly forecast on each station's own page, both from the National Weather Service
+- A 5-day forecast for each station, plus a 48-hour forecast drawn as a temperature line with a weather icon for each hour, colored like the Temperature gauge, with moving streaks on windy hours, both from the National Weather Service
 - Time ranges from Today up to everything saved, or pick your own dates
 - A station reporting health table that counts outages
 - Active National Weather Service alerts for each location, colored the way the NWS colors them
