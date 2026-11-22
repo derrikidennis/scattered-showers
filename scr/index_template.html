@@ -244,7 +244,7 @@ html:not(.still) .skstat{display:none}
 .skyb{position:relative;height:150px;margin:-16px -16px 12px;border-radius:11px 11px 0 0;overflow:hidden;background:#243461}
 .skyb svg.skysvg{position:absolute;left:0;top:0;width:100%;height:100%;display:block;overflow:hidden}
 .skyb::after{content:"";position:absolute;left:0;right:0;bottom:0;height:64px;background:linear-gradient(to bottom,rgba(6,10,18,0),rgba(6,10,18,.55));pointer-events:none}
-.skyn{position:absolute;z-index:2;left:18px;bottom:10px;font-size:15px;line-height:1.25;letter-spacing:.08em;text-transform:uppercase;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.75),0 0 9px rgba(0,0,0,.5);max-width:55%}
+.skyn{position:absolute;z-index:2;left:18px;bottom:10px;font-size:15px;line-height:1.25;letter-spacing:.08em;text-transform:uppercase;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.75),0 0 9px rgba(0,0,0,.5);max-width:55%;text-wrap:balance}
 .skyw{white-space:pre-line;position:absolute;z-index:2;right:18px;bottom:10px;font-size:15px;line-height:1.25;color:#fff;max-width:42%;text-align:right;text-shadow:0 1px 3px rgba(0,0,0,.75),0 0 9px rgba(0,0,0,.5)}
 .sktw{animation:sktw 3s ease-in-out infinite alternate}@keyframes sktw{from{opacity:.4}to{opacity:1}}
 .skrot{transform-origin:0 0;animation:skrot 90s linear infinite}@keyframes skrot{to{transform:rotate(360deg)}}
@@ -1589,6 +1589,8 @@ async function cvConditions(pl){
   }catch(e){ stations=[]; }
   const reads=await Promise.all(stations.map(async st=>{ try{
     const j=await cvGet("https://api.weather.gov/stations/"+encodeURIComponent(st.id)+"/observations?limit=8");
+    /* The sky words come from the newest report that has any, even a 5-minute special with no wind (those would otherwise be skipped and the words would be an hour old, 2026-11-22). Temperature and wind still need a full report. */
+    let sky=""; for(const f of (j.features||[])){ const p=f.properties||{}, ts0=Date.parse(p.timestamp), ag=(now-ts0)/60000; if(!isFinite(ts0)||ag<-10) continue; if(ag>120) break; if(p.textDescription){ sky=p.textDescription; break; } }
     for(const f of (j.features||[])){ const p=f.properties||{};
       const t=cvVal(p.temperature), w=cvVal(p.windSpeed), ts=Date.parse(p.timestamp);
       if(t===null||w===null||!isFinite(ts)) continue;
@@ -1596,7 +1598,7 @@ async function cvConditions(pl){
       const g=cvVal(p.windGust), sl=cvVal(p.seaLevelPressure), bp=cvVal(p.barometricPressure);
       let pr=null; if(sl!==null) pr=sl/3386.389; else if(bp!==null) pr=bp/3386.389;   /* airport barometricPressure is already the sea-level altimeter setting, so no elevation correction */
       if(pr!==null&&(pr<27||pr>32)) pr=null;
-      return {st,ts,age:Math.max(0,age),t:t*9/5+32,w:w/1.609344,g:g===null?null:g/1.609344,dir:cvVal(p.windDirection),rh:cvVal(p.relativeHumidity),pr,txt:p.textDescription||""};
+      return {st,ts,age:Math.max(0,age),t:t*9/5+32,w:w/1.609344,g:g===null?null:g/1.609344,dir:cvVal(p.windDirection),rh:cvVal(p.relativeHumidity),pr,txt:sky||p.textDescription||""};
     }
     return null;
   }catch(e){ return null; } }));
@@ -2417,7 +2419,7 @@ async function cvRadar(lat,lon){
   CV_RADAR.set(key,{at:Date.now(),v:v}); return v; }
 function cvRadarLvl(mm){ return mm<1.2?1:(mm<5?2:3); }
 function cvWetOf(r){
-  if(!r||(r.kind==="stations"&&r.age>60)||r.txtSrc==="forecast") return null;
+  if(!r||(r.kind==="stations"&&r.age>75)||r.txtSrc==="forecast") return null;
   const t=String(r.txt||"").toLowerCase();
   if(/chance|likely|possible|vicinity|slight|isolated/.test(t)) return null;
   const lv0=/blizzard|blowing/.test(t)?4:(/heavy/.test(t)?3:(/flurr|light|drizzle/.test(t)?1:2)), sh=/shower|squall/.test(t);
@@ -2435,13 +2437,13 @@ function cvWetOf(r){
 /* Fog, mist, haze and smoke: a separate layer, so "Light Snow Fog/Mist" gets both. Same gates as rain (observed words only; no "vicinity", "chance", stale or forecast text). {lvl 1 light veil, 2 fog, 3 dense; tone fog/haze/smoke} */
 /* Thunder from an observed word only: tier 0 = "in vicinity" (distant, soft, rare), 1 = thunder or thunderstorm, 2 = heavy or severe thunderstorm, or gusts of 35 mph or more. Forecast words, "chance/possible" words and stale station readings never count. */
 function cvStormOf(r){
-  if(!r||(r.kind==="stations"&&r.age>60)||r.txtSrc==="forecast") return null;
+  if(!r||(r.kind==="stations"&&r.age>75)||r.txtSrc==="forecast") return null;
   const t=String(r.txt||"").toLowerCase();
   if(!/thunder|t-storm/.test(t)||/chance|likely|possible|slight|isolated/.test(t)) return null;
   if(/vicinity/.test(t)) return {tier:0};
   return {tier:(/heavy|severe/.test(t)||(+r.g||0)>=35)?2:1}; }
 function cvFogOf(r){
-  if(!r||(r.kind==="stations"&&r.age>60)||r.txtSrc==="forecast") return null;
+  if(!r||(r.kind==="stations"&&r.age>75)||r.txtSrc==="forecast") return null;
   const t=String(r.txt||"").toLowerCase();
   if(!/fog|mist|haze|smoke/.test(t)||/chance|likely|possible|vicinity|slight|isolated|patchy/.test(t)) return null;
   if(/smoke/.test(t)) return {lvl:2,tone:"smoke"};
@@ -2450,9 +2452,9 @@ function cvFogOf(r){
   if(/fog/.test(t)) return {lvl:2,tone:"fog"};
   return {lvl:1,tone:"haze"}; }
 function cvWetFx(r){ const w=cvWetOf(r); if(!w) return null; const sx=r.dir==null||isNaN(+r.dir)?0:Math.sin(+r.dir*Math.PI/180); return {type:w.type,lvl:w.lvl,shower:w.shower,bz:w.bz||0,slant:sx*Math.min(1,(+r.w||0)/40)*0.9}; }
-function cvWindFx(r){ if(!r||(r.kind==="stations"&&r.age>60)) return null; const w=+r.w||0; return {ws:w,wg:Math.max(w,+r.g||0),dir:(r.dir==null||isNaN(+r.dir))?null:+r.dir}; }
+function cvWindFx(r){ if(!r||(r.kind==="stations"&&r.age>75)) return null; const w=+r.w||0; return {ws:w,wg:Math.max(w,+r.g||0),dir:(r.dir==null||isNaN(+r.dir))?null:+r.dir}; }
 function cvFxFor(r){
-  const late=r.kind==="stations"&&r.age>60, txt=r.txt||"", w0=cvWetOf(r), wet=!!w0&&w0.type!=="snow", sn=(w0&&w0.type==="snow")?w0.lvl:0, pt=!w0?"r":({snow:"s",ice:"i",sleet:"p",mix:"m",rain:"r",hail:"h"})[w0.type];
+  const late=r.kind==="stations"&&r.age>75, txt=r.txt||"", w0=cvWetOf(r), wet=!!w0&&w0.type!=="snow", sn=(w0&&w0.type==="snow")?w0.lvl:0, pt=!w0?"r":({snow:"s",ice:"i",sleet:"p",mix:"m",rain:"r",hail:"h"})[w0.type];
   return {pt:pt,shower:!!(w0&&w0.type==="rain"&&w0.shower),sshower:!!(w0&&w0.type==="snow"&&w0.shower),bz:(w0&&w0.type==="snow")?(w0.bz||0):0,snow:sn,rain:!late&&wet, t:[0.3,0.5,0.8,0.95][((cvWetOf(r)||{lvl:2}).lvl)-1], ws:late?0:(+r.w||0), wg:late?0:(+r.g||0)};
 }
 function customView(){
@@ -2520,7 +2522,7 @@ function customView(){
     cvTerrain(curPl.lat,curPl.lon).then(t=>{ if(t&&(t.t!==hz.terrain||t.w!==hz.water)){ hz.terrain=t.t; hz.water=t.w; if(bn._w&&bn.isConnected) bn._fill(bn._w); } });
     const row=el("div","row"); const hp=el("span","pill"); row.appendChild(hp); c.appendChild(row);
     const clock=ms=>new Date(ms).toLocaleTimeString([],{hour:"numeric",minute:"2-digit",timeZone:tz,timeZoneName:"short"});
-    if(r.kind==="stations"){ const late=r.age>60; hp.className="pill "+(late?"warn":"ok"); hp.textContent=(late?"▲ Late":"● Reporting")+" · "+(r.age<1?"just now":Math.round(r.age)+" min ago")+" · last reading "+clock(r.newest); }
+    if(r.kind==="stations"){ const late=r.age>75; hp.className="pill "+(late?"warn":"ok"); hp.textContent=(late?"▲ Late":"● Reporting")+" · "+(r.age<1?"just now":Math.round(r.age)+" min ago")+" · last reading "+clock(r.newest); }
     else { hp.className="pill warn"; hp.textContent="▲ Modeled · not measured"; }
     let src;
     if(r.kind==="stations"){
@@ -2528,7 +2530,7 @@ function customView(){
       src=r.n===1?"Station "+r.near.id+" ("+r.near.name+"), "+r.near.d.toFixed(1)+" mi away, reported "+age+".":r.n+" stations, "+r.dmin.toFixed(1)+" to "+r.dmax.toFixed(1)+" mi away, "+(Math.round(r.tmin)===Math.round(r.tmax)?"all "+Math.round(r.tmin):Math.round(r.tmin)+" to "+Math.round(r.tmax))+"°F, showing the middle reading. Nearest: "+r.near.id+" ("+r.near.name+"). Newest report "+age+".";
     } else src="Modeled for this spot, not measured. No nearby station had a fresh reading.";
     const srcNote=el("div","note",(r.txt?r.txt+". ":"")+src); c.appendChild(srcNote);
-    if(r.kind==="stations"&&r.age>60) c.appendChild(el("div","note cvlate","NWS airport data is running late."));
+    if(r.kind==="stations"&&r.age>75) c.appendChild(el("div","note cvlate","NWS airport data is running late."));
     const tiles=el("div","tiles");
     const trend=(hist&&hist.ago!==null)?Math.round(r.t-hist.ago):null;
     tiles.appendChild(cvTile(cs,"temp",fmt0(L.temp)+"°F",trend===null?"":(trend>0?"▲ ":trend<0?"▼ ":"● ")+Math.abs(trend)+"° in 3 h",offDial(L.temp)));
