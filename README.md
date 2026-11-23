@@ -6,7 +6,7 @@ A homemade weather dashboard for three backyard weather stations, and for any pl
 
 Version 1.2.0 (2026-11-23). What changed: [CHANGELOG.md](CHANGELOG.md).
 
-![The Scattered Showers dashboard in dark mode, showing current conditions and a 5-day forecast for three stations](docx/img/Scattered_Showers_Screenshot.png)
+![The Scattered Showers dashboard in dark mode, showing the Fort Wayne station: a sky banner, current conditions and the 48-hour temperature line](docx/img/Scattered_Showers_Screenshot.png)
 
 The stations are Acurite personal weather stations in Fort Wayne (Indiana), Elgin (Texas) and Kingsburg (California). The page works as a normal website and also installs to a phone or tablet home screen.
 
