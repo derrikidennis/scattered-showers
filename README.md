@@ -4,7 +4,7 @@ A homemade weather dashboard for three backyard weather stations, and for any pl
 
 **Live page: https://derrikidennis.github.io/scattered-showers/**
 
-Version 1.1.1 (2026-11-22). What changed: [CHANGELOG.md](CHANGELOG.md).
+Version 1.2.0 (2026-11-23). What changed: [CHANGELOG.md](CHANGELOG.md).
 
 ![The Scattered Showers dashboard in dark mode, showing current conditions and a 5-day forecast for three stations](docx/img/Scattered_Showers_Screenshot.png)
 
